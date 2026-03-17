@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-git)",
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-git --name content-dashboard)",
+      "Bash(mkdir -p \"C:/Users/Tu papi/Desktop/Ai Builts/Gabifit Proyect/Content Dashboard/tmpscaffold\")",
+      "Bash(npx create-next-app@latest gabifit-dashboard --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-git)",
+      "Bash(npx create-next-app@latest gabifit-dashboard --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-git --no-react-compiler)",
+      "Bash(npx shadcn@latest init --defaults)"
+    ]
+  }
+}
