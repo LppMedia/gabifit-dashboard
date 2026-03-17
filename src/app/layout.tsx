@@ -1,16 +1,20 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Barlow, Barlow_Condensed } from "next/font/google";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-const geistSans = Geist({
+// Body — Barlow for clean, athletic readability
+const barlow = Barlow({
   variable: "--font-sans",
   subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+// Display — Barlow Condensed for bold headings & stat numbers
+const barlowCondensed = Barlow_Condensed({
+  variable: "--font-display",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
@@ -23,10 +27,9 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    // Force dark mode globally — class="dark" is permanent
     <html lang="en" className="dark">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
+        className={`${barlow.variable} ${barlowCondensed.variable} antialiased bg-background text-foreground`}
       >
         <TooltipProvider delay={300}>{children}</TooltipProvider>
       </body>

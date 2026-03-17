@@ -66,17 +66,24 @@ function StatCard({
   label,
   count,
   color,
+  bg,
 }: {
   label: string;
   count: number;
   color: string;
+  bg: string;
 }) {
   return (
-    <div className="flex flex-col gap-1 rounded-xl border border-border/60 bg-card px-5 py-4">
-      <span className={cn("text-2xl font-bold tabular-nums", color)}>
+    <div className={cn(
+      "flex flex-col gap-0 rounded-xl border border-border/40 bg-card px-5 py-4 transition-all duration-200 hover:border-border/70",
+      "relative overflow-hidden"
+    )}>
+      {/* Subtle glow spot */}
+      <div className={cn("pointer-events-none absolute -right-4 -top-4 h-16 w-16 rounded-full blur-2xl opacity-30", bg)} />
+      <span className={cn("font-display text-[32px] font-bold leading-none tabular-nums", color)}>
         {count}
       </span>
-      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="mt-1.5 text-[12px] font-medium text-muted-foreground/70">{label}</span>
     </div>
   );
 }
@@ -149,10 +156,10 @@ export default function InstagramPage() {
 
         {/* ── Stats bar ──────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard label="Scheduled" count={byStatus("scheduled").length} color="text-emerald-400" />
-          <StatCard label="Drafts"    count={byStatus("draft").length}     color="text-zinc-300"    />
-          <StatCard label="Published" count={byStatus("published").length} color="text-blue-400"   />
-          <StatCard label="Backlog"   count={byStatus("backlog").length}   color="text-orange-400" />
+          <StatCard label="Scheduled" count={byStatus("scheduled").length} color="text-emerald-400" bg="bg-emerald-400" />
+          <StatCard label="Drafts"    count={byStatus("draft").length}     color="text-zinc-300"    bg="bg-zinc-400"    />
+          <StatCard label="Published" count={byStatus("published").length} color="text-blue-400"    bg="bg-blue-400"    />
+          <StatCard label="Backlog"   count={byStatus("backlog").length}   color="text-orange-400"  bg="bg-orange-400"  />
         </div>
 
         {/* ── Search ─────────────────────────────────────────────────── */}

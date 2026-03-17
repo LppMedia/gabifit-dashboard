@@ -6,7 +6,15 @@
       "Bash(mkdir -p \"C:/Users/Tu papi/Desktop/Ai Builts/Gabifit Proyect/Content Dashboard/tmpscaffold\")",
       "Bash(npx create-next-app@latest gabifit-dashboard --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-git)",
       "Bash(npx create-next-app@latest gabifit-dashboard --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-git --no-react-compiler)",
-      "Bash(npx shadcn@latest init --defaults)"
+      "Bash(npx shadcn@latest init --defaults)",
+      "Bash(npx shadcn@latest add badge card separator tooltip)",
+      "Bash(npm run:*)",
+      "Bash(cat \"C:/Users/Tu papi/Desktop/Ai Builts/Gabifit Proyect/Content Dashboard/src/app/\\(dashboard\\)/instagram/page.tsx\")",
+      "Bash(npx shadcn@latest add dialog tabs input textarea select label --yes)",
+      "Bash(npx shadcn@latest add dropdown-menu --yes)",
+      "Bash(claude skills:*)",
+      "Bash(claude plugin:*)",
+      "Bash(py \"C:/Users/Tu papi/.claude/skills/ui-ux-pro-max/scripts/search.py\" \"fitness content management dashboard dark saas\" --design-system -p \"GabiFit Content Dashboard\" -f markdown)"
     ]
   }
 }

@@ -1,64 +1,77 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Bell, Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Bell, Search, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 
-// Map pathnames → readable titles
-const ROUTE_TITLES: Record<string, string> = {
-  "/":            "Overview",
-  "/instagram":   "Instagram Manager",
-  "/analytics":   "Analytics",
-  "/calendar":    "Content Calendar",
-  "/competitors": "Competitors Tracker",
-  "/news":        "News Consolidator",
+// ─── Route config ─────────────────────────────────────────────────────────────
+const ROUTE_META: Record<string, { title: string; subtitle: string; color: string }> = {
+  "/":            { title: "Overview",           subtitle: "Your content hub at a glance",               color: "text-violet-400" },
+  "/instagram":   { title: "Instagram Manager",  subtitle: "Schedule, draft & publish content",          color: "text-pink-400"   },
+  "/analytics":   { title: "Analytics",          subtitle: "Growth, reach & engagement insights",        color: "text-cyan-400"   },
+  "/calendar":    { title: "Content Calendar",   subtitle: "Plan and organise your content pipeline",    color: "text-emerald-400" },
+  "/competitors": { title: "Competitors",        subtitle: "Monitor competing creators & brands",        color: "text-amber-400"  },
+  "/news":        { title: "News Consolidator",  subtitle: "Curated industry news & AI summaries",       color: "text-sky-400"    },
 };
 
+const FALLBACK = { title: "Dashboard", subtitle: "GabiFit Studio", color: "text-violet-400" };
+
+// ─── Component ────────────────────────────────────────────────────────────────
 export function Header() {
   const pathname = usePathname();
 
-  // Match the deepest known route
-  const title =
-    Object.entries(ROUTE_TITLES)
+  const meta =
+    Object.entries(ROUTE_META)
       .sort((a, b) => b[0].length - a[0].length)
       .find(([route]) => pathname === route || pathname.startsWith(route + "/"))?.[1] ??
-    "Dashboard";
+    FALLBACK;
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-border bg-background/80 px-6 backdrop-blur-sm">
-      {/* Page title */}
-      <div>
-        <h1 className="text-base font-semibold text-foreground">{title}</h1>
-        <p className="text-xs text-muted-foreground">
-          {new Date().toLocaleDateString("en-US", {
-            weekday: "long",
-            month: "long",
-            day: "numeric",
-            year: "numeric",
-          })}
+    <header className="flex h-16 items-center justify-between gap-4 border-b border-border/50 bg-background/60 px-6 backdrop-blur-md">
+
+      {/* ── Left: page title ──────────────────────────────────────────── */}
+      <div className="flex min-w-0 flex-col">
+        <h1 className={`font-display text-[17px] font-semibold leading-none tracking-tight ${meta.color}`}>
+          {meta.title}
+        </h1>
+        <p className="mt-1 truncate text-[11px] text-muted-foreground/60">
+          {meta.subtitle}
         </p>
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-          <Search className="h-4 w-4" />
-        </Button>
+      {/* ── Right: search + actions ───────────────────────────────────── */}
+      <div className="flex shrink-0 items-center gap-2">
+        {/* Search */}
+        <div className="relative hidden sm:block">
+          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/50" />
+          <Input
+            placeholder="Search…"
+            className="h-8 w-44 rounded-lg border-border/40 bg-white/[0.04] pl-8 text-xs placeholder:text-muted-foreground/40 focus-visible:w-56 focus-visible:border-border/80 transition-all duration-300"
+          />
+        </div>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative text-muted-foreground hover:text-foreground"
+        {/* Notifications */}
+        <button
+          className="relative flex h-8 w-8 items-center justify-center rounded-lg border border-border/30 bg-white/[0.03] text-muted-foreground/60 transition-all duration-150 hover:border-border/60 hover:bg-white/[0.07] hover:text-foreground"
+          aria-label="Notifications"
         >
-          <Bell className="h-4 w-4" />
-          <Badge className="absolute -right-0.5 -top-0.5 h-4 w-4 justify-center rounded-full p-0 text-[9px] bg-primary text-primary-foreground">
+          <Bell className="h-3.5 w-3.5" />
+          <Badge className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-pink-500 p-0 text-[9px] font-bold text-white border-0 shadow-sm shadow-pink-500/40">
             3
           </Badge>
-        </Button>
+        </button>
 
-        {/* Avatar placeholder */}
-        <div className="ml-2 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground select-none">
+        {/* AI quick action */}
+        <button
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-violet-500/30 bg-violet-500/10 text-violet-400 transition-all duration-150 hover:border-violet-500/60 hover:bg-violet-500/20"
+          aria-label="AI Assistant"
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+        </button>
+
+        {/* Avatar */}
+        <div className="relative ml-1 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-gradient-to-br from-pink-500 to-violet-600 text-[11px] font-bold text-white shadow-md shadow-violet-500/20 ring-2 ring-border/30 transition-all duration-150 hover:ring-violet-500/40 select-none">
           GF
         </div>
       </div>
