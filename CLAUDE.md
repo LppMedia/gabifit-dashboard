@@ -1,0 +1,167 @@
+# CLAUDE.md — GabiFit Content Dashboard
+
+> Living document. Update this file whenever architectural decisions, conventions,
+> or major dependencies change.
+
+---
+
+## 1. Project Overview
+
+**GabiFit Content Dashboard** is a Next.js web application for managing all content
+operations for the GabiFit brand. It aggregates five core areas into a single dark-themed
+management interface:
+
+| Section            | Route          | Purpose                                              |
+|--------------------|----------------|------------------------------------------------------|
+| Overview           | `/`            | Landing hub with quick-nav to all sections           |
+| Instagram Manager  | `/instagram`   | Post/story/reel scheduling & engagement management   |
+| Analytics          | `/analytics`   | Growth, reach, and engagement reporting              |
+| Content Calendar   | `/calendar`    | Cross-platform drag-and-drop scheduling              |
+| Competitors Tracker| `/competitors` | Monitor competing creators and brands                |
+| News Consolidator  | `/news`        | Curated RSS aggregation & AI summaries               |
+
+---
+
+## 2. Tech Stack
+
+| Layer          | Technology                          | Version  |
+|----------------|-------------------------------------|----------|
+| Framework      | Next.js (App Router)                | 16.x     |
+| Language       | TypeScript                          | 5.x      |
+| Styling        | Tailwind CSS v4                     | 4.x      |
+| Components     | Shadcn/ui (Radix UI primitives)     | 4.x      |
+| Icons          | Lucide React                        | latest   |
+| Fonts          | Geist Sans + Geist Mono (Google)    | —        |
+| Linting        | ESLint (eslint-config-next)         | 9.x      |
+| Package manager| npm                                 | —        |
+
+---
+
+## 3. Folder Structure
+
+```
+src/
+├── app/
+│   ├── layout.tsx                    # Root layout — forces dark mode, TooltipProvider
+│   ├── globals.css                   # Tailwind imports + CSS custom properties
+│   └── (dashboard)/                  # Route group — shares sidebar + header layout
+│       ├── layout.tsx                # Dashboard shell (Sidebar + Header + <main>)
+│       ├── page.tsx                  # /  — Overview / quick-nav
+│       ├── instagram/page.tsx        # /instagram
+│       ├── analytics/page.tsx        # /analytics
+│       ├── calendar/page.tsx         # /calendar
+│       ├── competitors/page.tsx      # /competitors
+│       └── news/page.tsx             # /news
+│
+├── components/
+│   ├── layout/
+│   │   ├── Sidebar.tsx               # Fixed left sidebar with nav links
+│   │   └── Header.tsx                # Top bar with page title, search, notifications
+│   ├── shared/
+│   │   └── PlaceholderSection.tsx    # Reusable placeholder for unbuilt sections
+│   └── ui/                           # Shadcn auto-generated components (do not hand-edit)
+│       ├── badge.tsx
+│       ├── button.tsx
+│       ├── card.tsx
+│       ├── separator.tsx
+│       ├── tooltip.tsx
+│       └── ...
+│
+└── lib/
+    └── utils.ts                      # cn() helper (clsx + tailwind-merge)
+```
+
+---
+
+## 4. Theme & Dark Mode
+
+- **Dark mode is permanent.** The `<html>` element always carries `class="dark"`.
+  There is no light mode and no toggle — this is a deliberate product decision.
+- Both `:root` and `.dark` selectors in `globals.css` define the **same** dark palette
+  so Shadcn components that check for `.dark` class work correctly.
+- The color palette uses **oklch** for perceptually uniform colors:
+  - Primary accent: violet `oklch(0.65 0.22 280)`
+  - Background: deep navy-black `oklch(0.13 0.01 265)`
+  - Card surface: `oklch(0.18 0.015 265)` (one step lighter than background)
+  - Sidebar: `oklch(0.16 0.015 265)` (between background and card)
+- Chart colors span the full hue range for quick visual distinction
+  (violet → cyan → green → amber → coral).
+
+---
+
+## 5. Routing Conventions
+
+- Uses the **App Router** with a **Route Group** `(dashboard)` to share the sidebar
+  layout without affecting the URL path.
+- All new dashboard sections go inside `src/app/(dashboard)/`.
+- The `(dashboard)/layout.tsx` wraps every section page with `<Sidebar>` and `<Header>`.
+- `Header.tsx` derives the page title by matching `pathname` against a `ROUTE_TITLES`
+  map — update that map when adding new routes.
+
+---
+
+## 6. Component Conventions
+
+### General
+- **PascalCase** for component files and exports (`Sidebar.tsx`, `PlaceholderSection.tsx`).
+- **"use client"** directive only when required (navigation hooks, interactivity).
+  Server components are preferred; add the directive surgically.
+- Props interfaces live in the same file as the component unless shared.
+
+### Shadcn/ui
+- Add new Shadcn components via CLI: `npx shadcn@latest add <component>`.
+- Never manually edit files inside `src/components/ui/` — they are regenerated by the CLI.
+- Wrap any component requiring `TooltipProvider` inside the root layout (already done).
+
+### Styling
+- Use Tailwind utility classes as the primary styling method.
+- Use the `cn()` helper (`@/lib/utils`) for conditional class merging.
+- Prefer semantic color tokens (`bg-background`, `text-muted-foreground`, `border-border`)
+  over raw Tailwind color classes so the palette stays centralised in `globals.css`.
+- Avoid inline `style={}` unless strictly necessary (e.g., dynamic values).
+
+### Icons
+- Source all icons from **lucide-react**.
+- Pass `className` for size and color: `<Icon className="h-4 w-4 text-pink-400" />`.
+
+---
+
+## 7. Key Decisions Log
+
+| # | Decision | Reason |
+|---|----------|--------|
+| 1 | App Router + Route Group `(dashboard)` | Shares layout without URL nesting; clean separation from future auth/onboarding routes |
+| 2 | Forced dark mode (no toggle) | Dashboard product — dark is the intended UX; avoids flash-of-light and theme-state complexity |
+| 3 | oklch color space | Perceptually uniform; vivid colors at consistent lightness across hue range |
+| 4 | Shadcn/ui over a full component library | Maximum flexibility; only ships components we actually use; Radix primitives ensure accessibility |
+| 5 | `PlaceholderSection` shared component | All 5 sections start as placeholders; single component keeps consistency while each section is built out |
+| 6 | Sidebar as a client component | Requires `usePathname()` for active-link highlighting |
+| 7 | Header derives title from `pathname` | Keeps page files clean — no need to pass titles as props or metadata |
+| 8 | Geist font via `next/font/google` | Zero layout shift; self-hosted by Next.js; matches modern dashboard aesthetic |
+
+---
+
+## 8. Development Commands
+
+```bash
+npm run dev       # Start dev server at http://localhost:3000
+npm run build     # Production build
+npm run start     # Serve production build
+npm run lint      # Run ESLint
+
+# Add a Shadcn component
+npx shadcn@latest add <component-name>
+```
+
+---
+
+## 9. Next Steps (Backlog)
+
+- [ ] Wire up Instagram Graph API in `/instagram`
+- [ ] Integrate charting library (Recharts or Chart.js) in `/analytics`
+- [ ] Build full calendar view with `react-big-calendar` or custom grid
+- [ ] Add RSS parsing + AI summarisation in `/news`
+- [ ] Implement competitor scraping pipeline in `/competitors`
+- [ ] Add authentication (NextAuth.js or Supabase Auth)
+- [ ] Mobile-responsive sidebar (collapsible / drawer)
+- [ ] Unit tests with Vitest + React Testing Library
