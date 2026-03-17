@@ -14,7 +14,9 @@
       "Bash(npx shadcn@latest add dropdown-menu --yes)",
       "Bash(claude skills:*)",
       "Bash(claude plugin:*)",
-      "Bash(py \"C:/Users/Tu papi/.claude/skills/ui-ux-pro-max/scripts/search.py\" \"fitness content management dashboard dark saas\" --design-system -p \"GabiFit Content Dashboard\" -f markdown)"
+      "Bash(py \"C:/Users/Tu papi/.claude/skills/ui-ux-pro-max/scripts/search.py\" \"fitness content management dashboard dark saas\" --design-system -p \"GabiFit Content Dashboard\" -f markdown)",
+      "Bash(npm install:*)",
+      "Bash(npx shadcn@latest add calendar popover --yes)"
     ]
   }
 }
