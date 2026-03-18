@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import { CalendarDays, LayoutGrid, List, Zap } from "lucide-react";
-import { CalendarFilters }  from "@/components/calendar/CalendarFilters";
-import { DayCell }          from "@/components/calendar/DayCell";
-import { PostDetailModal }  from "@/components/calendar/PostDetailModal";
+import { CalendarDays, LayoutGrid, List, Plus, Zap } from "lucide-react";
+import { CalendarFilters }     from "@/components/calendar/CalendarFilters";
+import { DayCell }             from "@/components/calendar/DayCell";
+import { PostDetailModal }     from "@/components/calendar/PostDetailModal";
+import { CalendarPostEditor }  from "@/components/calendar/CalendarPostEditor";
+import { useCalendarPosts }    from "@/lib/calendar-store";
 import {
-  CALENDAR_POSTS,
   buildCalendarGrid,
   DAY_NAMES,
   PlatformKey,
@@ -35,7 +36,7 @@ function ListView({
     return (
       <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/40 py-20">
         <CalendarDays className="h-8 w-8 text-muted-foreground/20" />
-        <p className="text-sm text-muted-foreground/40">No posts match current filters</p>
+        <p className="text-sm text-muted-foreground/40">No hay posts con los filtros actuales</p>
       </div>
     );
   }
@@ -44,7 +45,7 @@ function ListView({
     <div className="flex flex-col gap-3">
       {sortedDates.map((date) => {
         const dateObj = new Date(date + "T12:00:00");
-        const label   = dateObj.toLocaleDateString("en-US", {
+        const label   = dateObj.toLocaleDateString("es-ES", {
           weekday: "short", month: "short", day: "numeric",
         });
         const isToday = date === new Date().toISOString().slice(0, 10);
@@ -56,10 +57,10 @@ function ListView({
                 isToday && "text-emerald-400"
               )}
             >
-              <span className={cn("text-[13px] font-semibold", isToday ? "text-emerald-400" : "text-foreground/70")}>
-                {label.split(",")[0]}
+              <span className={cn("text-[13px] font-semibold capitalize", isToday ? "text-emerald-400" : "text-foreground/70")}>
+                {label.split(" ")[0]}
               </span>
-              <span className="text-[11px] text-muted-foreground/50">{label.split(",")[1]}</span>
+              <span className="text-[11px] text-muted-foreground/50">{label.split(" ").slice(1).join(" ")}</span>
             </div>
             <div className="flex flex-1 flex-col gap-1.5 border-l border-border/30 pl-4">
               {grouped[date].map((post) => {
@@ -91,6 +92,11 @@ function ListView({
                           {ctype.label}
                         </span>
                         <span className="text-[10px] text-muted-foreground/40">{post.format}</span>
+                        {post.script && (
+                          <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-400">
+                            guion ✓
+                          </span>
+                        )}
                       </div>
                       <p className="truncate text-[12px] text-foreground/75">{post.caption}</p>
                     </div>
@@ -120,9 +126,9 @@ function ListView({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function CalendarPage() {
-  const today      = new Date();
+  const today   = new Date();
   const [year,  setYear]  = useState(2026);
-  const [month, setMonth] = useState(3); // default to March 2026 (data month)
+  const [month, setMonth] = useState(3);
 
   const [activePlatforms, setActivePlatforms] = useState<PlatformKey[]>(
     Object.keys(PLATFORMS) as PlatformKey[]
@@ -130,8 +136,17 @@ export default function CalendarPage() {
   const [activeTypes, setActiveTypes] = useState<ContentTypeKey[]>(
     Object.keys(CONTENT_TYPES) as ContentTypeKey[]
   );
-  const [selectedPost, setSelectedPost] = useState<CalendarPost | null>(null);
+
+  // Modal / editor state
+  const [selectedPost,    setSelectedPost]    = useState<CalendarPost | null>(null);
+  const [editingPost,     setEditingPost]     = useState<CalendarPost | null>(null);
+  const [creatingForDate, setCreatingForDate] = useState<string | null>(null);
+  const [editorOpen,      setEditorOpen]      = useState(false);
+
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+
+  // Persistent store
+  const { posts, hydrated, addPost, updatePost, deletePost } = useCalendarPosts();
 
   // Navigation
   const goToPrev  = () => { if (month === 1) { setMonth(12); setYear(y => y - 1); } else setMonth(m => m - 1); };
@@ -158,13 +173,13 @@ export default function CalendarPage() {
   // Filtered posts for this month
   const filteredPosts = useMemo(() => {
     const prefix = `${year}-${String(month).padStart(2, "0")}`;
-    return CALENDAR_POSTS.filter(
+    return posts.filter(
       (p) =>
         p.date.startsWith(prefix) &&
         activePlatforms.includes(p.platform) &&
         activeTypes.includes(p.type)
     );
-  }, [year, month, activePlatforms, activeTypes]);
+  }, [posts, year, month, activePlatforms, activeTypes]);
 
   // Posts keyed by date
   const postsByDate = useMemo(() => {
@@ -175,12 +190,37 @@ export default function CalendarPage() {
     return map;
   }, [filteredPosts]);
 
-  const grid    = useMemo(() => buildCalendarGrid(year, month), [year, month]);
+  const grid     = useMemo(() => buildCalendarGrid(year, month), [year, month]);
   const todayStr = today.toISOString().slice(0, 10);
 
-  // Stats for current view
+  // Stats
   const scheduled  = filteredPosts.filter((p) => p.status === "scheduled").length;
   const published  = filteredPosts.filter((p) => p.status === "published").length;
+  const withScript = filteredPosts.filter((p) => p.script).length;
+
+  // Handlers
+  const openNewPost = useCallback((date?: string) => {
+    setEditingPost(null);
+    setCreatingForDate(date ?? null);
+    setEditorOpen(true);
+  }, []);
+
+  const openEditPost = useCallback((post: CalendarPost) => {
+    setEditingPost(post);
+    setCreatingForDate(null);
+    setEditorOpen(true);
+  }, []);
+
+  const handleSave = useCallback(
+    (payload: Omit<CalendarPost, "id"> | CalendarPost) => {
+      if ("id" in payload) {
+        updatePost(payload.id, payload);
+      } else {
+        addPost(payload);
+      }
+    },
+    [addPost, updatePost]
+  );
 
   return (
     <>
@@ -196,31 +236,43 @@ export default function CalendarPage() {
                 Content Calendar
               </h1>
               <p className="text-[12px] text-muted-foreground/60">
-                <span className="font-semibold text-emerald-400">{published}</span> published ·{" "}
-                <span className="font-semibold text-amber-400">{scheduled}</span> scheduled this month
+                <span className="font-semibold text-emerald-400">{published}</span> publicados ·{" "}
+                <span className="font-semibold text-amber-400">{scheduled}</span> programados ·{" "}
+                <span className="font-semibold text-violet-400">{withScript}</span> con guion
               </p>
             </div>
           </div>
 
-          {/* View toggle */}
-          <div className="flex items-center gap-1 rounded-xl border border-border/40 bg-card p-1">
-            {([
-              { mode: "grid" as const, icon: LayoutGrid },
-              { mode: "list" as const, icon: List },
-            ]).map(({ mode, icon: Icon }) => (
-              <button
-                key={mode}
-                onClick={() => setViewMode(mode)}
-                className={cn(
-                  "flex h-7 w-7 items-center justify-center rounded-lg transition-all duration-150",
-                  viewMode === mode
-                    ? "bg-emerald-500/20 text-emerald-400"
-                    : "text-muted-foreground/40 hover:text-muted-foreground"
-                )}
-              >
-                <Icon className="h-3.5 w-3.5" />
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            {/* New post button */}
+            <button
+              onClick={() => openNewPost()}
+              className="flex items-center gap-1.5 rounded-xl bg-emerald-500/15 px-3 py-2 text-[12px] font-semibold text-emerald-400 ring-1 ring-emerald-500/30 transition-all hover:bg-emerald-500/25"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Nuevo post
+            </button>
+
+            {/* View toggle */}
+            <div className="flex items-center gap-1 rounded-xl border border-border/40 bg-card p-1">
+              {([
+                { mode: "grid" as const, icon: LayoutGrid },
+                { mode: "list" as const, icon: List },
+              ]).map(({ mode, icon: Icon }) => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={cn(
+                    "flex h-7 w-7 items-center justify-center rounded-lg transition-all duration-150",
+                    viewMode === mode
+                      ? "bg-emerald-500/20 text-emerald-400"
+                      : "text-muted-foreground/40 hover:text-muted-foreground"
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -240,7 +292,17 @@ export default function CalendarPage() {
         </div>
 
         {/* ── Calendar grid ────────────────────────────────────────────── */}
-        {viewMode === "grid" ? (
+        {!hydrated ? (
+          /* Loading skeleton */
+          <div className="grid grid-cols-7 gap-1">
+            {Array.from({ length: 35 }).map((_, i) => (
+              <div
+                key={i}
+                className="min-h-[110px] animate-pulse rounded-xl border border-border/20 bg-card/30"
+              />
+            ))}
+          </div>
+        ) : viewMode === "grid" ? (
           <div className="flex flex-col gap-1">
             {/* Day headers */}
             <div className="grid grid-cols-7 gap-1">
@@ -268,7 +330,7 @@ export default function CalendarPage() {
                     isToday={dateStr === todayStr}
                     posts={postsByDate[dateStr] ?? []}
                     onChipClick={setSelectedPost}
-                    onDayClick={(_date) => {/* future: open new post drawer */}}
+                    onDayClick={(date) => openNewPost(date)}
                   />
                 );
               })}
@@ -281,7 +343,7 @@ export default function CalendarPage() {
         {/* ── Footer note ──────────────────────────────────────────────── */}
         <div className="flex items-center justify-center gap-2 pb-2 text-[11px] text-muted-foreground/25">
           <Zap className="h-3 w-3" />
-          <span>Content calendar · Click any chip to view post details</span>
+          <span>Content Calendar · Haz clic en un chip para ver detalles · + para crear posts</span>
         </div>
       </div>
 
@@ -289,6 +351,21 @@ export default function CalendarPage() {
       <PostDetailModal
         post={selectedPost}
         onOpenChange={(open) => { if (!open) setSelectedPost(null); }}
+        onEdit={openEditPost}
+      />
+
+      {/* ── Post editor (create / edit) ────────────────────────────────── */}
+      <CalendarPostEditor
+        open={editorOpen}
+        onClose={() => {
+          setEditorOpen(false);
+          setEditingPost(null);
+          setCreatingForDate(null);
+        }}
+        editPost={editingPost}
+        defaultDate={creatingForDate ?? undefined}
+        onSave={handleSave}
+        onDelete={deletePost}
       />
     </>
   );

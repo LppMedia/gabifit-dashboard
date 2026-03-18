@@ -93,6 +93,16 @@ export const CONTENT_TYPES: Record<ContentTypeKey, ContentType> = {
   },
 };
 
+// ─── Media file (metadata only — object URL is session-only) ─────────────────
+export interface MediaFile {
+  id:         string;
+  name:       string;
+  type:       string;   // MIME type e.g. "image/jpeg" | "video/mp4"
+  size:       number;   // bytes
+  /** Object URL created by URL.createObjectURL() — NOT persisted, only in memory */
+  url?:       string;
+}
+
 // ─── Calendar post ────────────────────────────────────────────────────────────
 export interface CalendarPost {
   id:          string;
@@ -102,10 +112,22 @@ export interface CalendarPost {
   type:        ContentTypeKey;
   status:      PostStatusKey;
   caption:     string;
-  format:      string;          // "Reel" | "Post" | "Story" | "Video" | "Tweet"
+  format:      string;          // "Reel" | "Post" | "Story" | "Video" | "Tweet" …
   hashtags?:   string;
+  /** Full content script / guion for this post */
+  script?:     string;
+  /** Uploaded media — metadata only; url is session-only (object URL) */
+  mediaFiles?: MediaFile[];
+  /** Internal production notes visible only in this dashboard */
+  notes?:      string;
   engagement?: { likes: number; comments: number; shares: number } | null;
 }
+
+// ─── Available formats ────────────────────────────────────────────────────────
+export const FORMATS = [
+  "Reel", "Video", "Short", "Carousel", "Post", "Story", "Tweet", "Thread", "Article",
+] as const;
+export type FormatKey = typeof FORMATS[number];
 
 // ─── Seed data — March 2026 ───────────────────────────────────────────────────
 // Posts up to Mar 17 = published; from Mar 18+ = scheduled
@@ -116,6 +138,27 @@ export const CALENDAR_POSTS: CalendarPost[] = [
     platform: "tiktok", type: "viralidad", status: "published", format: "Video",
     caption: "Leg day challenge en serio 💀 ¿Quién se apunta? #legday #challenge",
     hashtags: "#legday #fitness #gabifit",
+    script: `[HOOK — 0s]
+Cámara directa al peso: sin hablar, solo mostrar la carga del día.
+
+[REVEAL — 3s]
+"Hoy es día de pierna. En serio."
+→ Texto overlay: 'No es broma hoy'
+
+[DEMO — 8s-40s]
+Secuencia rápida con texto overlay en cada ejercicio:
+• Squats 4×15 @ peso corporal + barra
+• Romanian Deadlift 3×12
+• Leg Press 4×20
+• Walking Lunges al fallo
+
+[TWIST VIRAL — 40s-55s]
+Corte de edición: subiendo escaleras al día siguiente.
+Cara de sufrimiento puro. Música dramática.
+
+[CTA — 55s-60s]
+"¿Quién se apunta? Comenta 🦵 si esto va a ser tu plan este finde."
+→ Texto overlay: 'tag tu compañero de pierna'`,
     engagement: { likes: 2840, comments: 312, shares: 180 },
   },
   {
@@ -123,6 +166,35 @@ export const CALENDAR_POSTS: CalendarPost[] = [
     platform: "instagram", type: "informativo", status: "published", format: "Carousel",
     caption: "5 hábitos de sueño que mejorarán tu rendimiento 🌙 Guarda este post para cuando lo necesites.",
     hashtags: "#sleep #recovery #gabifit",
+    script: `[SLIDE 1 — COVER]
+"5 hábitos de sueño que disparan tu rendimiento"
+Foto: cama con luz tenue, ambiente relajado.
+
+[SLIDE 2]
+Hábito 1: Apaga pantallas 60 min antes.
+→ Por qué: la luz azul bloquea la melatonina y dispara el cortisol.
+→ Alternativa: libro, estiramientos suaves, meditación.
+
+[SLIDE 3]
+Hábito 2: Cuarto a 18–20°C.
+→ Por qué: la caída de temperatura corporal activa el sueño profundo (REM).
+→ Truco: ventilador o ventana entreabierta.
+
+[SLIDE 4]
+Hábito 3: Misma hora siempre (incluso fines de semana).
+→ Por qué: el ritmo circadiano regula la recuperación muscular y hormonal.
+
+[SLIDE 5]
+Hábito 4: Magnesio glicinato antes de dormir.
+→ Dosis: 200–400 mg. Fuentes naturales: espinacas, semillas de calabaza.
+
+[SLIDE 6]
+Hábito 5: Última cafeína antes de las 14h.
+→ La vida media real de la cafeína es de 5–7 horas. Haz el cálculo.
+
+[SLIDE 7 — CTA]
+"¿Cuál empiezas esta semana? Cuéntame abajo 👇"
+→ Recuerda pedir que guarden el post.`,
     engagement: { likes: 980, comments: 94, shares: 140 },
   },
   {
@@ -130,6 +202,42 @@ export const CALENDAR_POSTS: CalendarPost[] = [
     platform: "youtube", type: "informativo", status: "published", format: "Video",
     caption: "Tutorial full body workout — 45 min sin equipo, para cualquier nivel.",
     hashtags: "#workout #tutorial #gabifit",
+    script: `[INTRO — 0:00-2:00]
+Bienvenida. Presentar el workout: full body, 45 min, sin equipo.
+"Solo necesitas una esterilla y ganas."
+Mencionar niveles: principiante/intermedio con modificaciones.
+
+[CALENTAMIENTO — 2:00-7:00]
+• Rotación de caderas 30s cada lado
+• Sentadilla de cajón × 10 reps lentas
+• Rotación de brazos 30s cada dirección
+• Marcha elevada de rodillas 60s
+
+[BLOQUE 1 — UPPER BODY — 7:00-20:00]
+• Push-ups 3×12 (modificación en rodillas para principiantes)
+• Pike push-ups 3×10
+• Dips en silla 3×15
+• Superman hold 3×30s
+→ Descanso 60s entre series. Mostrar forma correcta en cada ejercicio.
+
+[BLOQUE 2 — CORE — 20:00-32:00]
+• Dead bug 3×12 (explicar respiración)
+• Mountain climbers 3×30 reps
+• Hollow body hold 3×30s
+• Plank lateral 3×30s cada lado
+
+[BLOQUE 3 — LOWER BODY — 32:00-42:00]
+• Sentadillas 4×15
+• Glute bridges 4×20 (variación una pierna para avanzados)
+• Step-ups 3×12 cada pierna
+• Calf raises 3×20
+
+[VUELTA A LA CALMA — 42:00-47:00]
+Estiramientos: cuádriceps, isquiotibiales, cadera, pecho, hombros.
+
+[OUTRO — 47:00]
+Recordatorio de suscribirse + campana.
+Próximo video: nutrición pre y post workout.`,
     engagement: { likes: 1420, comments: 231, shares: 88 },
   },
   {
@@ -144,6 +252,25 @@ export const CALENDAR_POSTS: CalendarPost[] = [
     platform: "tiktok", type: "viralidad", status: "published", format: "Video",
     caption: "POV: el día después de pierna 😂 Tag a tu compañero de entreno.",
     hashtags: "#legday #funny #gabifit",
+    script: `[HOOK — 0s]
+Sin intro. Directo al grano: plano de intentar bajar las escaleras.
+Cara de sufrimiento total. Música dramática de fondo.
+
+[GAGS — 5s-50s]
+Secuencia de clips cortos (3-5s cada uno):
+1. Levantarse del sofá → micro-drama
+2. Agacharse a recoger algo del suelo
+3. Entrar al coche (bajarse de rodillas casi)
+4. Bajar del coche al llegar al trabajo
+5. Primera sentada del día en la silla
+
+[TWIST — 50s]
+Texto overlay: "Y aun así..."
+→ Corte a: yo preparando la sesión de pierna de la semana siguiente.
+
+[CTA — 58s]
+"Tag tu compañero de dolor 😂"
+Texto overlay: "#legday #elquenolabebelapierde"`,
     engagement: { likes: 5200, comments: 640, shares: 920 },
   },
   {
@@ -165,6 +292,34 @@ export const CALENDAR_POSTS: CalendarPost[] = [
     platform: "instagram", type: "viralidad", status: "published", format: "Reel",
     caption: "5 movimientos para esculpir el core en menos de 10 minutos 💪 ¡Guárdalo!",
     hashtags: "#core #workout #gabifit",
+    script: `[HOOK — 0s]
+"5 movimientos. 10 minutos. Core de fuego 🔥"
+Mostrar resultado visual (abdomen trabajado, sin ser explícita).
+
+[MOVIMIENTO 1 — 5s]
+Plank to Downdog × 10 reps
+→ Texto overlay: nombre + rep count
+→ Cueing en voz: "activa el ombligo hacia dentro"
+
+[MOVIMIENTO 2 — 25s]
+Dead Bug × 12 reps
+→ Corrección clave en overlay: "lumbar pegada al suelo TODO el tiempo"
+
+[MOVIMIENTO 3 — 45s]
+Hollow Body Hold × 30s
+→ Overlay: "si la zona lumbar se despega, sube las piernas"
+
+[MOVIMIENTO 4 — 65s]
+Russian Twists × 20 reps
+→ Opción con peso / sin peso según nivel
+
+[MOVIMIENTO 5 — 85s]
+Plank Lateral × 30s cada lado
+→ Overlay: "cadera arriba, no te hundas"
+
+[OUTRO — 105s]
+"Guárdalo y hazlo mañana en ayunas 👇 ¿Cuántas rondas puedes completar?"
+→ Pedir que comenten y guarden.`,
     engagement: { likes: 1420, comments: 184, shares: 310 },
   },
   {
@@ -214,6 +369,38 @@ export const CALENDAR_POSTS: CalendarPost[] = [
     platform: "instagram", type: "informativo", status: "published", format: "Carousel",
     caption: "Guía de meal prep semanal: todo lo que como para rendir en el entreno.",
     hashtags: "#mealprep #nutrition #gabifit",
+    script: `[SLIDE 1 — COVER]
+Título: "Mi meal prep semanal completo — todo lo que como para rendir"
+Foto: mesa con tupper bien organizado y colorido.
+
+[SLIDE 2 — PROTEÍNAS]
+Pollo al horno × 1 kg (sal, ajo, orégano, AOVE) + Salmón × 2 filetes.
+Tiempo de preparación: 35 min. Rendimiento: 5 días.
+
+[SLIDE 3 — HIDRATOS]
+Arroz blanco 500g cocido (con caldo de verduras para sabor).
+Boniato asado × 4 uds. (con canela opcional).
+Nota: hidratos post-entreno = mejor recuperación.
+
+[SLIDE 4 — VERDURAS]
+Brócoli al vapor × 1 cabeza entera.
+Judías verdes salteadas con ajo.
+Espinacas frescas para ensaladas rápidas.
+
+[SLIDE 5 — SNACKS]
+Yogur griego 0% × 5 botes (+ miel + fruta).
+Fruta cortada en taper (fresas, mango, arándanos).
+Frutos secos pre-pesados: 30g por bolsita.
+
+[SLIDE 6 — TABLA DE COMBOS]
+Desayuno: yogur + fruta + frutos secos.
+Pre-entreno: arroz + pollo + verduras.
+Post-entreno: boniato + pollo + brócoli.
+Cena: salmón + espinacas + aguacate.
+
+[SLIDE 7 — CTA]
+"¿Haces meal prep? Cuéntame tu truco favorito 👇"
+"Guarda este post para el próximo domingo."`,
     engagement: { likes: 1240, comments: 167, shares: 340 },
   },
   {
@@ -228,12 +415,53 @@ export const CALENDAR_POSTS: CalendarPost[] = [
     platform: "instagram", type: "viralidad", status: "scheduled", format: "Reel",
     caption: "Morning workout: el ritual que cambió mi día completamente 🌅",
     hashtags: "#morning #workout #gabifit",
+    script: `[HOOK — 0s]
+Toma al amanecer. Luz natural. Sin maquillaje. Auténtico.
+"Las 6:30 AM. Aquí empieza todo."
+
+[RITUAL — 5s-45s]
+Secuencia cronológica con texto overlay de hora:
+• 6:30 — Vaso de agua + electrolitos
+• 6:35 — 5 min de movilidad (cadera, columna, hombros)
+• 6:40 — 20 min de workout (mostrar 3-4 ejercicios key)
+• 7:00 — Ducha fría (reacción honesta)
+• 7:10 — Desayuno preparado anoche
+
+[MENSAJE — 45s]
+"No es magia. Es repetición. Llevo 8 meses así y ya no concibo mi día de otra forma."
+
+[CTA — 55s]
+"¿Eres de mañanas o de noches para entrenar? Cuéntame abajo 👇"`,
+    notes: "Grabar de lunes a viernes. La luz de las 6:30 AM en marzo es perfecta. Necesito cámara en trípode.",
   },
   {
     id: "c18", date: "2026-03-19", time: "18:00",
     platform: "tiktok", type: "informativo", status: "scheduled", format: "Video",
     caption: "Los 3 errores más comunes al hacer sentadillas (y cómo corregirlos).",
     hashtags: "#squats #form #gabifit",
+    script: `[HOOK — 0s]
+"¿Llevas meses haciendo sentadillas y tus rodillas te odian? Mira esto."
+
+[ERROR 1 — 5s]
+Las rodillas caen hacia dentro (valgo de rodilla).
+→ Demostración del error primero.
+→ Corrección: activar glúteos antes de bajar, pensar en "empujar las rodillas hacia fuera".
+→ Cue visual: banda elástica justo por encima de rodillas.
+
+[ERROR 2 — 25s]
+Taconeo al bajar (talones se levantan).
+→ Demostración del error.
+→ Corrección: elevar talones con disco si falta movilidad de tobillo, o trabajar movilidad.
+→ Cue: "imagina que tienes las raíces en el suelo".
+
+[ERROR 3 — 45s]
+Inclinación excesiva del torso hacia delante.
+→ Demostración vs versión correcta.
+→ Corrección: mirada al frente, pecho arriba, core activado.
+
+[OUTRO — 60s]
+"¿Cuál de estos tres te pasa a ti? Comenta el número 1, 2 o 3."`,
+    notes: "Grabar en el gym con cámara lateral para que se vea la forma. Necesito a alguien que grabe.",
   },
   {
     id: "c19", date: "2026-03-20", time: "10:00",
