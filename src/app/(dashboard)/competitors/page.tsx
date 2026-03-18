@@ -9,6 +9,8 @@ import {
   BarChart2,
   TrendingUp,
   Zap,
+  Instagram,
+  AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -27,6 +29,10 @@ import { CompetitorCard } from "@/components/competitors/CompetitorCard";
 import { PostsTable } from "@/components/competitors/PostsTable";
 import { PostAnalysisModal } from "@/components/competitors/PostAnalysisModal";
 import { AddCompetitorDialog } from "@/components/competitors/AddCompetitorDialog";
+import { useScrapedData } from "@/lib/scraped-store";
+import { ScrapedVideoCard } from "@/components/competitors/ScrapedVideoCard";
+import { LiveAnalysisModal } from "@/components/competitors/LiveAnalysisModal";
+import { ScrapedPost } from "@/lib/scraped-types";
 
 // ─── Skeleton ──────────────────────────────────────────────────────────────────
 function CardSkeleton() {
@@ -81,7 +87,12 @@ function StatCard({
 }: StatCardProps) {
   return (
     <div className="rounded-xl border border-border/40 bg-card p-4 flex items-center gap-3">
-      <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center flex-shrink-0", iconBg)}>
+      <div
+        className={cn(
+          "h-10 w-10 rounded-lg flex items-center justify-center flex-shrink-0",
+          iconBg
+        )}
+      >
         <Icon className={cn("h-5 w-5", iconColor)} />
       </div>
       <div className="min-w-0">
@@ -112,10 +123,23 @@ export default function CompetitorsPage() {
     refreshAll,
   } = useCompetitors();
 
+  const {
+    data: scrapedDataMap,
+    scraping,
+    transcribing,
+    analyzing,
+    errors: scrapedErrors,
+    scrapeCompetitor,
+    fetchTranscript,
+    analyzePost,
+  } = useScrapedData();
+
   const [selectedPost, setSelectedPost] = useState<CompetitorPost | null>(null);
   const [selectedCompetitor, setSelectedCompetitor] =
     useState<Competitor | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [livePost, setLivePost] = useState<ScrapedPost | null>(null);
+  const [liveCompetitorId, setLiveCompetitorId] = useState<string | null>(null);
 
   const allPosts = getAllPosts(competitors);
 
@@ -251,7 +275,8 @@ export default function CompetitorsPage() {
           sub={
             fastestGrowing.competitor
               ? `${fastestGrowing.competitor.name} · ${
-                  PLATFORM_META[fastestGrowing.platform]?.label ?? fastestGrowing.platform
+                  PLATFORM_META[fastestGrowing.platform]?.label ??
+                  fastestGrowing.platform
                 }`
               : "—"
           }
@@ -309,6 +334,159 @@ export default function CompetitorsPage() {
         )}
       </section>
 
+      {/* ── Live Instagram Scraping ─────────────────────────────────────────────── */}
+      {hydrated && competitors.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <Instagram className="h-4 w-4 text-pink-400" />
+              Top Videos en Vivo — Instagram
+            </h2>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-pink-500/15 border border-pink-500/25 text-pink-400 font-medium">
+              Powered by Apify
+            </span>
+          </div>
+
+          {/* Per-competitor scrape sections */}
+          <div className="flex flex-col gap-6">
+            {competitors
+              .filter((c) => c.platforms.includes("instagram"))
+              .map((competitor) => {
+                const scraped = scrapedDataMap[competitor.id];
+                const isScraping = scraping.has(competitor.id);
+                const err = scrapedErrors[competitor.id];
+                const igHandle = competitor.handle;
+
+                return (
+                  <div
+                    key={competitor.id}
+                    className="rounded-xl border border-border/40 bg-card/50 p-4"
+                  >
+                    {/* Competitor header row */}
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <div className="flex items-center gap-2.5">
+                        {/* Avatar with gradient */}
+                        <div
+                          className={cn(
+                            "h-8 w-8 rounded-full bg-gradient-to-br flex items-center justify-center text-white text-xs font-bold flex-shrink-0",
+                            competitor.avatarGradient
+                          )}
+                        >
+                          {competitor.name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">
+                            {competitor.name}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {igHandle}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {scraped && (
+                          <span className="text-[10px] text-muted-foreground/50">
+                            {new Date(scraped.scrapedAt).toLocaleDateString(
+                              "es-ES",
+                              { day: "numeric", month: "short" }
+                            )}
+                          </span>
+                        )}
+                        <button
+                          onClick={() =>
+                            scrapeCompetitor(competitor.id, igHandle)
+                          }
+                          disabled={isScraping}
+                          className={cn(
+                            "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium border transition-all",
+                            isScraping
+                              ? "bg-pink-500/10 border-pink-500/25 text-pink-400/50 cursor-not-allowed"
+                              : "bg-pink-500/15 border-pink-500/30 text-pink-400 hover:bg-pink-500/25"
+                          )}
+                        >
+                          {isScraping ? (
+                            <>
+                              <RefreshCw className="h-3 w-3 animate-spin" />
+                              Scrapeando...
+                            </>
+                          ) : (
+                            <>
+                              <Instagram className="h-3 w-3" />
+                              {scraped
+                                ? "Re-scrapear"
+                                : "Scrapear Instagram"}
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Error state */}
+                    {err && (
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/25 text-red-400 text-[12px] mb-3">
+                        <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                        {err}
+                      </div>
+                    )}
+
+                    {/* Empty state */}
+                    {!scraped && !isScraping && !err && (
+                      <div className="flex flex-col items-center justify-center py-8 gap-2">
+                        <Instagram className="h-6 w-6 text-muted-foreground/30" />
+                        <p className="text-[12px] text-muted-foreground/50">
+                          Haz clic en &quot;Scrapear Instagram&quot; para obtener los top
+                          videos
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Scraping skeleton */}
+                    {isScraping && (
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {[1, 2, 3, 4].map((i) => (
+                          <div
+                            key={i}
+                            className="rounded-xl overflow-hidden border border-border/30 animate-pulse"
+                          >
+                            <div className="aspect-video bg-white/[0.05]" />
+                            <div className="p-3 space-y-2">
+                              <div className="h-3 bg-white/[0.05] rounded w-3/4" />
+                              <div className="h-3 bg-white/[0.04] rounded w-1/2" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Scraped video grid */}
+                    {scraped && scraped.posts.length > 0 && (
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {scraped.posts.slice(0, 12).map((post) => (
+                          <ScrapedVideoCard
+                            key={post.id}
+                            post={post}
+                            competitorId={competitor.id}
+                            onOpenAnalysis={(p) => {
+                              setLivePost(p);
+                              setLiveCompetitorId(competitor.id);
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {scraped && scraped.posts.length === 0 && (
+                      <p className="text-[12px] text-muted-foreground/50 text-center py-4">
+                        No se encontraron posts públicos
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+          </div>
+        </section>
+      )}
+
       {/* ── Posts table ───────────────────────────────────────────────────────── */}
       {hydrated && allPosts.length > 0 && (
         <section>
@@ -332,8 +510,8 @@ export default function CompetitorsPage() {
       <div className="flex items-center gap-2 text-[11px] text-muted-foreground/50 pb-2">
         <Zap className="h-3 w-3" />
         <span>
-          Los datos son simulados y se actualizan localmente. Conecta la API de
-          cada plataforma para datos en tiempo real.
+          Los datos simulados se combinan con scraping real vía Apify. Configura
+          APIFY_API_TOKEN y ANTHROPIC_API_KEY en .env.local
         </span>
       </div>
 
@@ -351,6 +529,23 @@ export default function CompetitorsPage() {
         post={selectedPost}
         competitor={selectedCompetitor}
         onClose={handleCloseModal}
+      />
+
+      <LiveAnalysisModal
+        post={livePost}
+        competitorId={liveCompetitorId}
+        scrapedData={
+          liveCompetitorId ? (scrapedDataMap[liveCompetitorId] ?? null) : null
+        }
+        onClose={() => {
+          setLivePost(null);
+          setLiveCompetitorId(null);
+        }}
+        onFetchTranscript={fetchTranscript}
+        onAnalyze={analyzePost}
+        transcribing={transcribing}
+        analyzing={analyzing}
+        errors={scrapedErrors}
       />
     </div>
   );
