@@ -16,6 +16,8 @@ import {
   Loader2,
   AlertCircle,
   RefreshCw,
+  CheckCircle2,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrapedPost, CompetitorScrapedData } from "@/lib/scraped-types";
@@ -32,6 +34,11 @@ function fmt(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return String(n);
+}
+
+function proxyImg(url: string) {
+  if (!url) return "";
+  return `/api/proxy-image?url=${encodeURIComponent(url)}`;
 }
 
 // ─── Props ─────────────────────────────────────────────────────────────────────
@@ -72,6 +79,58 @@ const HOOK_TYPE_COLORS: Record<string, string> = {
   sorpresa: "bg-pink-500/20 border-pink-500/30 text-pink-300",
 };
 
+// ─── Step indicator ────────────────────────────────────────────────────────────
+
+function StepBar({
+  hasTranscript,
+  hasAnalysis,
+  isVideo,
+}: {
+  hasTranscript: boolean;
+  hasAnalysis: boolean;
+  isVideo: boolean;
+}) {
+  const steps = isVideo
+    ? [
+        { label: "Ver post", done: true },
+        { label: "Transcript", done: hasTranscript },
+        { label: "Análisis IA", done: hasAnalysis },
+        { label: "Adaptar", done: hasAnalysis },
+      ]
+    : [
+        { label: "Ver post", done: true },
+        { label: "Análisis IA", done: hasAnalysis },
+        { label: "Adaptar", done: hasAnalysis },
+      ];
+
+  return (
+    <div className="flex items-center gap-1.5 px-5 py-2 bg-white/[0.02] border-b border-border/20 flex-shrink-0">
+      {steps.map((step, i) => (
+        <div key={i} className="flex items-center gap-1.5">
+          <div
+            className={cn(
+              "flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border transition-all",
+              step.done
+                ? "bg-emerald-500/15 border-emerald-500/25 text-emerald-400"
+                : "bg-white/[0.04] border-border/30 text-muted-foreground/50"
+            )}
+          >
+            {step.done ? (
+              <CheckCircle2 className="h-2.5 w-2.5" />
+            ) : (
+              <span className="h-2.5 w-2.5 rounded-full border border-current opacity-50" />
+            )}
+            {step.label}
+          </div>
+          {i < steps.length - 1 && (
+            <span className="text-muted-foreground/30 text-[10px]">→</span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 export function LiveAnalysisModal({
@@ -98,9 +157,23 @@ export function LiveAnalysisModal({
   const transcriptError = errors[`transcript-${postUrl}`] ?? null;
   const analyzeError = errors[`analyze-${postUrl}`] ?? null;
 
+  const isVideoPost = post?.type === "Video";
+
   function handleClose() {
     setActiveTab("video");
     onClose();
+  }
+
+  // Caption-only analysis (for images / carousels that have no audio)
+  function handleAnalyzeCaption() {
+    if (!post || !competitorId) return;
+    onAnalyze(
+      competitorId,
+      post.url,
+      `[Sin audio — análisis basado en caption]\n\n${post.caption}`,
+      post.caption,
+      post.ownerUsername
+    );
   }
 
   if (!post || !competitorId) return null;
@@ -112,13 +185,16 @@ export function LiveAnalysisModal({
       <div className="flex flex-col gap-4">
         {/* Thumbnail */}
         <div className="relative aspect-video rounded-lg overflow-hidden bg-gradient-to-br from-violet-900/40 to-pink-900/40">
-          {post.displayUrl ? (
+          {post.displayUrl && (
             <img
-              src={post.displayUrl}
+              src={proxyImg(post.displayUrl)}
               alt="Thumbnail"
               className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = "none";
+              }}
             />
-          ) : null}
+          )}
           {post.type === "Video" && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="h-12 w-12 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center">
@@ -130,50 +206,33 @@ export function LiveAnalysisModal({
 
         {/* Metrics grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="rounded-lg border border-border/40 bg-white/[0.03] p-3 flex flex-col gap-1">
-            <div className="flex items-center gap-1.5 text-muted-foreground">
-              <Eye className="h-3.5 w-3.5" />
-              <span className="text-[11px] uppercase tracking-wide font-medium">
-                Views
-              </span>
+          {[
+            { icon: Eye, label: "Views", value: fmt(post.videoViewCount) },
+            { icon: Heart, label: "Likes", value: fmt(post.likesCount) },
+            {
+              icon: MessageCircle,
+              label: "Comments",
+              value: fmt(post.commentsCount),
+            },
+            {
+              icon: Clock,
+              label: "Duración",
+              value: post.durationSec != null ? `${post.durationSec}s` : "—",
+            },
+          ].map(({ icon: Icon, label, value }) => (
+            <div
+              key={label}
+              className="rounded-lg border border-border/40 bg-white/[0.03] p-3 flex flex-col gap-1"
+            >
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <Icon className="h-3.5 w-3.5" />
+                <span className="text-[11px] uppercase tracking-wide font-medium">
+                  {label}
+                </span>
+              </div>
+              <p className="text-base font-bold text-foreground">{value}</p>
             </div>
-            <p className="text-base font-bold text-foreground">
-              {fmt(post.videoViewCount)}
-            </p>
-          </div>
-          <div className="rounded-lg border border-border/40 bg-white/[0.03] p-3 flex flex-col gap-1">
-            <div className="flex items-center gap-1.5 text-muted-foreground">
-              <Heart className="h-3.5 w-3.5" />
-              <span className="text-[11px] uppercase tracking-wide font-medium">
-                Likes
-              </span>
-            </div>
-            <p className="text-base font-bold text-foreground">
-              {fmt(post.likesCount)}
-            </p>
-          </div>
-          <div className="rounded-lg border border-border/40 bg-white/[0.03] p-3 flex flex-col gap-1">
-            <div className="flex items-center gap-1.5 text-muted-foreground">
-              <MessageCircle className="h-3.5 w-3.5" />
-              <span className="text-[11px] uppercase tracking-wide font-medium">
-                Comments
-              </span>
-            </div>
-            <p className="text-base font-bold text-foreground">
-              {fmt(post.commentsCount)}
-            </p>
-          </div>
-          <div className="rounded-lg border border-border/40 bg-white/[0.03] p-3 flex flex-col gap-1">
-            <div className="flex items-center gap-1.5 text-muted-foreground">
-              <Clock className="h-3.5 w-3.5" />
-              <span className="text-[11px] uppercase tracking-wide font-medium">
-                Duración
-              </span>
-            </div>
-            <p className="text-base font-bold text-foreground">
-              {post.durationSec != null ? `${post.durationSec}s` : "—"}
-            </p>
-          </div>
+          ))}
         </div>
 
         {/* Caption */}
@@ -190,16 +249,49 @@ export function LiveAnalysisModal({
           </div>
         )}
 
-        {/* External link */}
-        <a
-          href={post.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-[13px] text-violet-400 hover:text-violet-300 transition-colors font-medium"
-        >
-          Ver en Instagram
-          <ExternalLink className="h-3.5 w-3.5" />
-        </a>
+        {/* CTA row */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <a
+            href={post.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-[13px] text-violet-400 hover:text-violet-300 transition-colors font-medium"
+          >
+            Ver en Instagram
+            <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+
+          {/* Quick-action: go to transcript or analyze caption */}
+          {!analysis && !isAnalyzing && (
+            isVideoPost ? (
+              <button
+                onClick={() => setActiveTab("transcript")}
+                className="inline-flex items-center gap-1.5 text-[13px] text-violet-400 hover:text-violet-300 transition-colors font-medium border-l border-border/30 pl-3"
+              >
+                <Mic className="h-3.5 w-3.5" />
+                Obtener transcript →
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  handleAnalyzeCaption();
+                  setActiveTab("estructura");
+                }}
+                disabled={isAnalyzing}
+                className="inline-flex items-center gap-1.5 text-[13px] text-emerald-400 hover:text-emerald-300 transition-colors font-medium border-l border-border/30 pl-3"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Analizar con IA →
+              </button>
+            )
+          )}
+          {analysis && (
+            <span className="inline-flex items-center gap-1 text-[12px] text-emerald-400 border-l border-border/30 pl-3">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Análisis listo
+            </span>
+          )}
+        </div>
       </div>
     );
   }
@@ -208,12 +300,89 @@ export function LiveAnalysisModal({
   function renderTranscript() {
     if (!post || !competitorId) return null;
 
+    // Non-video post — no audio, offer caption analysis instead
+    if (!isVideoPost) {
+      return (
+        <div className="flex flex-col gap-4">
+          <div className="rounded-xl border border-amber-500/25 bg-amber-500/[0.08] p-4 flex items-start gap-3">
+            <FileText className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-amber-300 mb-1">
+                Este post no es un video con audio
+              </p>
+              <p className="text-[12px] text-amber-200/70 leading-relaxed">
+                Es un{" "}
+                <strong>
+                  {post.type === "Sidecar" ? "carrusel" : "post de imagen"}
+                </strong>
+                . No hay audio que transcribir, pero podemos analizar su{" "}
+                <strong>caption, estructura y copy</strong> con IA para extraer
+                las tácticas que usa.
+              </p>
+            </div>
+          </div>
+
+          {/* Show caption preview */}
+          {post.caption && (
+            <div>
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-medium mb-1.5">
+                Caption completo
+              </p>
+              <pre className="text-[12px] text-muted-foreground/80 font-mono whitespace-pre-wrap leading-relaxed bg-white/[0.02] border border-border/20 rounded-lg p-4 max-h-[250px] overflow-y-auto">
+                {post.caption}
+              </pre>
+            </div>
+          )}
+
+          {/* Analyze caption button */}
+          {!analysis && !isAnalyzing && (
+            <button
+              onClick={() => {
+                handleAnalyzeCaption();
+                setActiveTab("estructura");
+              }}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/30 transition-all self-start"
+            >
+              <Sparkles className="h-4 w-4" />
+              Analizar caption con IA →
+            </button>
+          )}
+
+          {isAnalyzing && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin text-violet-400" />
+              Analizando con Claude AI...
+            </div>
+          )}
+
+          {analysis && (
+            <p className="text-[12px] text-emerald-400 flex items-center gap-1.5">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Análisis completado — ve a la pestaña &#34;🏗️ Estructura&#34;
+            </p>
+          )}
+
+          {analyzeError && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/25 text-red-400 text-[12px]">
+              <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+              {analyzeError}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Video post transcript flow
     if (isTranscribing) {
       return (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
           <Loader2 className="h-8 w-8 text-violet-400 animate-spin" />
           <p className="text-sm text-muted-foreground text-center">
-            Obteniendo transcript... esto puede tomar 1-2 min
+            Obteniendo transcript con IA...
+            <br />
+            <span className="text-[11px] text-muted-foreground/60">
+              Esto puede tomar 1-2 minutos
+            </span>
           </p>
         </div>
       );
@@ -245,10 +414,11 @@ export function LiveAnalysisModal({
           </div>
           <div className="text-center">
             <p className="text-sm font-semibold text-foreground mb-1">
-              Transcript no disponible
+              Transcribir audio del video
             </p>
             <p className="text-[12px] text-muted-foreground max-w-xs">
-              Usa IA para transcribir el audio de este video automáticamente
+              Apify convierte el audio del Reel en texto para que puedas
+              analizar qué dice exactamente
             </p>
           </div>
           <button
@@ -264,36 +434,34 @@ export function LiveAnalysisModal({
 
     return (
       <div className="flex flex-col gap-4">
-        {/* Header row */}
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/[0.06] border border-border/40 text-muted-foreground font-medium uppercase tracking-wide">
             {transcript.language}
           </span>
           <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/25 text-emerald-400 font-medium">
-            Obtenido
+            ✓ Obtenido
           </span>
           <span className="text-[10px] text-muted-foreground/50 ml-auto">
             {new Date(transcript.fetchedAt).toLocaleString("es-ES")}
           </span>
         </div>
 
-        {/* Transcript text */}
-        <pre className="text-[12px] text-muted-foreground/80 font-mono whitespace-pre-wrap leading-relaxed bg-white/[0.02] border border-border/20 rounded-lg p-4 max-h-[400px] overflow-y-auto">
+        <pre className="text-[12px] text-muted-foreground/80 font-mono whitespace-pre-wrap leading-relaxed bg-white/[0.02] border border-border/20 rounded-lg p-4 max-h-[350px] overflow-y-auto">
           {transcript.transcript}
         </pre>
 
-        {/* Analyze button — only if no analysis yet */}
         {!analysis && !isAnalyzing && (
           <button
-            onClick={() =>
+            onClick={() => {
               onAnalyze(
                 competitorId,
                 post.url,
                 transcript.transcript,
                 post.caption,
                 post.ownerUsername
-              )
-            }
+              );
+              setActiveTab("estructura");
+            }}
             className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold bg-violet-500/20 border border-violet-500/30 text-violet-300 hover:bg-violet-500/30 transition-all self-start"
           >
             <Sparkles className="h-4 w-4" />
@@ -308,8 +476,8 @@ export function LiveAnalysisModal({
         )}
         {analysis && (
           <p className="text-[12px] text-emerald-400 flex items-center gap-1.5">
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            Análisis completado — ve a la pestaña "🏗️ Estructura"
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            Análisis completado — ve a la pestaña &#34;🏗️ Estructura&#34;
           </p>
         )}
       </div>
@@ -324,67 +492,57 @@ export function LiveAnalysisModal({
       return (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
           <Loader2 className="h-8 w-8 text-violet-400 animate-spin" />
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground text-center">
             Analizando con Claude AI...
+            <br />
+            <span className="text-[11px] text-muted-foreground/60">
+              Generando hook, estructura, tono y tácticas
+            </span>
           </p>
         </div>
       );
     }
 
     if (!analysis) {
-      if (transcript) {
-        return (
-          <div className="flex flex-col items-center justify-center py-16 gap-4">
-            <Sparkles className="h-8 w-8 text-violet-400/50" />
-            <div className="text-center">
-              <p className="text-sm font-semibold text-foreground mb-1">
-                Análisis no generado
-              </p>
-              <p className="text-[12px] text-muted-foreground">
-                Ya tienes el transcript. Genera el análisis con Claude AI.
-              </p>
-            </div>
-            {analyzeError && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/25 text-red-400 text-[12px]">
-                <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
-                {analyzeError}
-              </div>
-            )}
-            <button
-              onClick={() =>
-                onAnalyze(
-                  competitorId,
-                  post.url,
-                  transcript.transcript,
-                  post.caption,
-                  post.ownerUsername
-                )
-              }
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold bg-violet-500/20 border border-violet-500/30 text-violet-300 hover:bg-violet-500/30 transition-all"
-            >
-              <Sparkles className="h-4 w-4" />
-              Analizar con IA
-            </button>
-          </div>
-        );
-      }
       return (
-        <div className="flex flex-col items-center justify-center py-16 gap-3">
-          <Mic className="h-8 w-8 text-muted-foreground/30" />
+        <div className="flex flex-col items-center justify-center py-16 gap-4">
+          <Sparkles className="h-8 w-8 text-violet-400/50" />
           <div className="text-center">
             <p className="text-sm font-semibold text-foreground mb-1">
-              Primero obtén el transcript
+              {isVideoPost
+                ? "Primero obtén el transcript"
+                : "Análisis no generado aún"}
             </p>
             <p className="text-[12px] text-muted-foreground">
-              Ve a la pestaña "📝 Transcript" y obtén el transcript con IA
+              {isVideoPost
+                ? 'Ve a la pestaña "📝 Transcript" y transcribe el audio'
+                : 'Ve a "📝 Transcript" y haz clic en "Analizar caption con IA"'}
             </p>
           </div>
-          <button
-            onClick={() => setActiveTab("transcript")}
-            className="text-[12px] text-violet-400 hover:text-violet-300 transition-colors underline underline-offset-2"
-          >
-            Ir a Transcript →
-          </button>
+          {analyzeError && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/25 text-red-400 text-[12px]">
+              <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+              {analyzeError}
+            </div>
+          )}
+          {/* Quick action button */}
+          {!isVideoPost && !isAnalyzing && (
+            <button
+              onClick={() => handleAnalyzeCaption()}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/30 transition-all"
+            >
+              <Sparkles className="h-4 w-4" />
+              Analizar caption con IA
+            </button>
+          )}
+          {isVideoPost && (
+            <button
+              onClick={() => setActiveTab("transcript")}
+              className="text-[12px] text-violet-400 hover:text-violet-300 transition-colors underline underline-offset-2"
+            >
+              Ir a Transcript →
+            </button>
+          )}
         </div>
       );
     }
@@ -399,7 +557,7 @@ export function LiveAnalysisModal({
         <div className="rounded-lg border border-violet-500/25 bg-violet-500/10 p-4">
           <div className="flex items-center gap-2 mb-2">
             <p className="text-[11px] font-semibold text-violet-300 uppercase tracking-wide">
-              Hook
+              Hook de apertura
             </p>
             <span
               className={cn(
@@ -418,12 +576,12 @@ export function LiveAnalysisModal({
         {/* Structure timeline */}
         <div>
           <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-            Estructura
+            Estructura del contenido
           </p>
           <div className="flex flex-col gap-2">
             {analysis.structure.map((item, i) => (
               <div key={i} className="flex gap-3 items-start">
-                <span className="text-[10px] font-mono font-bold text-sky-400 bg-sky-500/15 border border-sky-500/25 px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5">
+                <span className="text-[10px] font-mono font-bold text-sky-400 bg-sky-500/15 border border-sky-500/25 px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5 whitespace-nowrap">
                   {item.time}
                 </span>
                 <div className="min-w-0 flex-1">
@@ -475,29 +633,51 @@ export function LiveAnalysisModal({
             ))}
           </div>
         </div>
+
+        {/* Go to Adaptar */}
+        <button
+          onClick={() => setActiveTab("adaptar")}
+          className="flex items-center gap-2 text-[12px] text-violet-400 hover:text-violet-300 transition-colors self-start"
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          Ver cómo adaptar para GabiFit →
+        </button>
       </div>
     );
   }
 
   // ── Tab 4: Adaptar ────────────────────────────────────────────────────────────
   function renderAdaptar() {
+    if (isAnalyzing) {
+      return (
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <Loader2 className="h-8 w-8 text-violet-400 animate-spin" />
+          <p className="text-sm text-muted-foreground">
+            Generando adaptación para GabiFit...
+          </p>
+        </div>
+      );
+    }
+
     if (!analysis) {
       return (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
           <Sparkles className="h-8 w-8 text-muted-foreground/30" />
           <div className="text-center">
             <p className="text-sm font-semibold text-foreground mb-1">
-              Primero analiza la estructura
+              Primero genera el análisis
             </p>
             <p className="text-[12px] text-muted-foreground">
-              Ve a "🏗️ Estructura" y genera el análisis con IA
+              {isVideoPost
+                ? 'Ve a "📝 Transcript" → transcribe → analiza'
+                : 'Ve a "📝 Transcript" → "Analizar caption con IA"'}
             </p>
           </div>
           <button
-            onClick={() => setActiveTab("estructura")}
+            onClick={() => setActiveTab("transcript")}
             className="text-[12px] text-violet-400 hover:text-violet-300 transition-colors underline underline-offset-2"
           >
-            Ir a Estructura →
+            Ir a Transcript →
           </button>
         </div>
       );
@@ -507,10 +687,14 @@ export function LiveAnalysisModal({
 
     return (
       <div className="flex flex-col gap-5">
-        {/* Title */}
-        <p className="text-sm font-semibold text-foreground">
-          {gabifitAdaptation.title}
-        </p>
+        <div className="flex items-center gap-2">
+          <div className="h-6 w-6 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0">
+            <Sparkles className="h-3.5 w-3.5 text-emerald-400" />
+          </div>
+          <p className="text-sm font-semibold text-foreground">
+            {gabifitAdaptation.title}
+          </p>
+        </div>
 
         {/* Tips */}
         <div className="flex flex-col gap-3">
@@ -533,22 +717,22 @@ export function LiveAnalysisModal({
         </div>
 
         {/* Suggested Hook */}
-        <div className="rounded-lg border-l-4 border-emerald-500 bg-emerald-500/[0.07] border border-emerald-500/20 pl-4 pr-3 py-3">
+        <div className="rounded-lg border-l-[3px] border-emerald-500 bg-emerald-500/[0.06] border border-emerald-500/20 pl-4 pr-3 py-3">
           <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wide mb-1.5">
-            Hook para GabiFit:
+            Hook sugerido para GabiFit:
           </p>
           <p className="text-[13px] text-foreground/85 italic leading-relaxed">
-            "{gabifitAdaptation.suggestedHook}"
+            &ldquo;{gabifitAdaptation.suggestedHook}&rdquo;
           </p>
         </div>
 
         {/* Suggested CTA */}
-        <div className="rounded-lg border-l-4 border-violet-500 bg-violet-500/[0.07] border border-violet-500/20 pl-4 pr-3 py-3">
+        <div className="rounded-lg border-l-[3px] border-violet-500 bg-violet-500/[0.06] border border-violet-500/20 pl-4 pr-3 py-3">
           <p className="text-[10px] font-bold text-violet-400 uppercase tracking-wide mb-1.5">
-            CTA para GabiFit:
+            CTA sugerido para GabiFit:
           </p>
           <p className="text-[13px] text-foreground/85 italic leading-relaxed">
-            "{gabifitAdaptation.suggestedCTA}"
+            &ldquo;{gabifitAdaptation.suggestedCTA}&rdquo;
           </p>
         </div>
       </div>
@@ -563,8 +747,15 @@ export function LiveAnalysisModal({
         <DialogHeader className="px-5 pt-5 pb-0 flex-shrink-0">
           <div className="flex items-start justify-between gap-3">
             <DialogTitle className="text-sm font-semibold text-foreground leading-tight">
-              <span className="text-muted-foreground font-normal">@{post.ownerUsername} · </span>
-              {post.type === "Video" ? "Reel" : post.type === "Sidecar" ? "Carrusel" : "Post"} —{" "}
+              <span className="text-muted-foreground font-normal">
+                @{post.ownerUsername} ·{" "}
+              </span>
+              {post.type === "Video"
+                ? "Reel"
+                : post.type === "Sidecar"
+                ? "Carrusel"
+                : "Post"}{" "}
+              —{" "}
               <a
                 href={post.url}
                 target="_blank"
@@ -584,8 +775,15 @@ export function LiveAnalysisModal({
           </div>
         </DialogHeader>
 
+        {/* Step progress bar */}
+        <StepBar
+          hasTranscript={!!transcript || !isVideoPost}
+          hasAnalysis={!!analysis}
+          isVideo={isVideoPost}
+        />
+
         {/* Tabs */}
-        <div className="flex items-center gap-0.5 px-5 pt-4 pb-0 flex-shrink-0 border-b border-border/30">
+        <div className="flex items-center gap-0.5 px-5 pt-3 pb-0 flex-shrink-0 border-b border-border/30">
           {TABS.map((tab) => (
             <button
               key={tab.id}

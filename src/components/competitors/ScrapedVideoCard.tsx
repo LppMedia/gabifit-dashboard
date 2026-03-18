@@ -68,9 +68,12 @@ export function ScrapedVideoCard({
       <div className="relative aspect-video overflow-hidden">
         {post.displayUrl ? (
           <img
-            src={post.displayUrl}
+            src={`/api/proxy-image?url=${encodeURIComponent(post.displayUrl)}`}
             alt={post.caption.slice(0, 60) || "Post de Instagram"}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-violet-900/40 to-pink-900/40" />
