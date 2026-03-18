@@ -9,6 +9,8 @@ import {
   CheckCircle2,
   Archive,
   Search,
+  TrendingUp,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,14 +18,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { PostCard } from "@/components/instagram/PostCard";
 import { NewPostDialog } from "@/components/instagram/NewPostDialog";
+import { AccountConnect } from "@/components/instagram/AccountConnect";
+import { ProfileHeader } from "@/components/instagram/ProfileHeader";
+import { ProfileMetrics } from "@/components/instagram/ProfileMetrics";
+import { RealPostsGrid } from "@/components/instagram/RealPostsGrid";
 import {
   useInstagramPosts,
   InstagramPost,
   PostStatus,
 } from "@/lib/instagram-store";
+import { useIgProfile } from "@/lib/instagram-profile-store";
 import { cn } from "@/lib/utils";
 
-// ─── Tab definition ───────────────────────────────────────────────────────────
+// ─── Tab definition ────────────────────────────────────────────────────────────
 const TABS: {
   value: PostStatus;
   label: string;
@@ -61,7 +68,7 @@ const TABS: {
   },
 ];
 
-// ─── Stat card ────────────────────────────────────────────────────────────────
+// ─── Stat card ─────────────────────────────────────────────────────────────────
 function StatCard({
   label,
   count,
@@ -74,28 +81,61 @@ function StatCard({
   bg: string;
 }) {
   return (
-    <div className={cn(
-      "flex flex-col gap-0 rounded-xl border border-border/40 bg-card px-5 py-4 transition-all duration-200 hover:border-border/70",
-      "relative overflow-hidden"
-    )}>
+    <div
+      className={cn(
+        "flex flex-col gap-0 rounded-xl border border-border/40 bg-card px-5 py-4 transition-all duration-200 hover:border-border/70",
+        "relative overflow-hidden"
+      )}
+    >
       {/* Subtle glow spot */}
-      <div className={cn("pointer-events-none absolute -right-4 -top-4 h-16 w-16 rounded-full blur-2xl opacity-30", bg)} />
-      <span className={cn("font-display text-[32px] font-bold leading-none tabular-nums", color)}>
+      <div
+        className={cn(
+          "pointer-events-none absolute -right-4 -top-4 h-16 w-16 rounded-full blur-2xl opacity-30",
+          bg
+        )}
+      />
+      <span
+        className={cn(
+          "font-display text-[32px] font-bold leading-none tabular-nums",
+          color
+        )}
+      >
         {count}
       </span>
-      <span className="mt-1.5 text-[12px] font-medium text-muted-foreground/70">{label}</span>
+      <span className="mt-1.5 text-[12px] font-medium text-muted-foreground/70">
+        {label}
+      </span>
     </div>
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Page ──────────────────────────────────────────────────────────────────────
 export default function InstagramPage() {
+  // Post management store
   const { hydrated, addPost, updatePost, deletePost, byStatus } =
     useInstagramPosts();
 
+  // Real analytics store
+  const {
+    profile,
+    loading: profileLoading,
+    error: profileError,
+    scrapeProfile,
+    clearProfile,
+    analytics,
+  } = useIgProfile();
+
+  // Pending handle shown in loading card
+  const [pendingHandle, setPendingHandle] = useState("");
+
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editPost, setEditPost]     = useState<InstagramPost | null>(null);
-  const [search, setSearch]         = useState("");
+  const [editPost, setEditPost] = useState<InstagramPost | null>(null);
+  const [search, setSearch] = useState("");
+
+  const handleConnect = (handle: string) => {
+    setPendingHandle(handle);
+    scrapeProfile(handle);
+  };
 
   const handleSave = (data: Omit<InstagramPost, "id" | "createdAt">) => {
     if (editPost) {
@@ -129,7 +169,7 @@ export default function InstagramPage() {
   return (
     <>
       <div className="flex flex-col gap-6">
-        {/* ── Page header ────────────────────────────────────────────── */}
+        {/* ── Page header ─────────────────────────────────────────── */}
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-500/15 ring-1 ring-pink-500/30">
@@ -140,7 +180,7 @@ export default function InstagramPage() {
                 Instagram Manager
               </h1>
               <p className="text-sm text-muted-foreground">
-                Manage your content pipeline — schedule, draft, and publish.
+                Análisis en tiempo real y gestión de contenido.
               </p>
             </div>
           </div>
@@ -154,15 +194,100 @@ export default function InstagramPage() {
           </Button>
         </div>
 
-        {/* ── Stats bar ──────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard label="Scheduled" count={byStatus("scheduled").length} color="text-emerald-400" bg="bg-emerald-400" />
-          <StatCard label="Drafts"    count={byStatus("draft").length}     color="text-zinc-300"    bg="bg-zinc-400"    />
-          <StatCard label="Published" count={byStatus("published").length} color="text-blue-400"    bg="bg-blue-400"    />
-          <StatCard label="Backlog"   count={byStatus("backlog").length}   color="text-orange-400"  bg="bg-orange-400"  />
+        {/* ══════════════════════════════════════════════════════════
+            REAL ANALYTICS SECTION
+        ══════════════════════════════════════════════════════════ */}
+        <div className="flex flex-col gap-4">
+          {/* Section title */}
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-pink-400" />
+            <h2 className="text-sm font-semibold text-foreground">
+              Análisis de cuenta real
+            </h2>
+          </div>
+
+          {/* Account connect card */}
+          <AccountConnect
+            loading={profileLoading}
+            currentHandle={profile?.username ?? null}
+            error={profileError}
+            onConnect={handleConnect}
+            onDisconnect={clearProfile}
+            scrapedAt={profile?.scrapedAt ?? null}
+          />
+
+          {/* Loading card */}
+          {profileLoading && (
+            <div className="flex items-center justify-center gap-3 rounded-xl border border-border/40 bg-card py-10">
+              <Loader2 className="h-5 w-5 animate-spin text-pink-400" />
+              <p className="text-sm text-muted-foreground">
+                Analizando perfil de @{pendingHandle || profile?.username}…
+                esto puede tomar 1–2 minutos
+              </p>
+            </div>
+          )}
+
+          {/* Profile data — only when not loading */}
+          {!profileLoading && profile && (
+            <div className="flex flex-col gap-4">
+              {/* Profile header */}
+              <ProfileHeader profile={profile} />
+
+              {/* Metrics */}
+              {analytics && <ProfileMetrics analytics={analytics} />}
+
+              {/* Posts grid */}
+              {profile.posts.length > 0 && (
+                <RealPostsGrid posts={profile.posts} />
+              )}
+            </div>
+          )}
         </div>
 
-        {/* ── Search ─────────────────────────────────────────────────── */}
+        {/* ══════════════════════════════════════════════════════════
+            DIVIDER
+        ══════════════════════════════════════════════════════════ */}
+        <div className="flex items-center gap-3">
+          <div className="h-px flex-1 bg-border/40" />
+          <span className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground/60">
+            Gestión de contenido
+          </span>
+          <div className="h-px flex-1 bg-border/40" />
+        </div>
+
+        {/* ══════════════════════════════════════════════════════════
+            POST MANAGEMENT (existing)
+        ══════════════════════════════════════════════════════════ */}
+
+        {/* ── Stats bar ──────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard
+            label="Scheduled"
+            count={byStatus("scheduled").length}
+            color="text-emerald-400"
+            bg="bg-emerald-400"
+          />
+          <StatCard
+            label="Drafts"
+            count={byStatus("draft").length}
+            color="text-zinc-300"
+            bg="bg-zinc-400"
+          />
+          <StatCard
+            label="Published"
+            count={byStatus("published").length}
+            color="text-blue-400"
+            bg="bg-blue-400"
+          />
+          <StatCard
+            label="Backlog"
+            count={byStatus("backlog").length}
+            color="text-orange-400"
+            bg="bg-orange-400"
+          />
+        </div>
+
+        {/* ── Search ─────────────────────────────────────────────── */}
         <div className="relative max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -173,7 +298,7 @@ export default function InstagramPage() {
           />
         </div>
 
-        {/* ── Tabs ───────────────────────────────────────────────────── */}
+        {/* ── Tabs ───────────────────────────────────────────────── */}
         <Tabs defaultValue="scheduled" className="w-full">
           <TabsList className="mb-1 h-auto gap-1 bg-card p-1">
             {TABS.map(({ value, label, icon: Icon, iconColor }) => {
@@ -250,7 +375,7 @@ export default function InstagramPage() {
         </Tabs>
       </div>
 
-      {/* ── New / Edit dialog ─────────────────────────────────────────── */}
+      {/* ── New / Edit dialog ─────────────────────────────────────── */}
       <NewPostDialog
         open={dialogOpen}
         onOpenChange={(open) => {
