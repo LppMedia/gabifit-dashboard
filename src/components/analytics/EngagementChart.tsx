@@ -1,21 +1,19 @@
 "use client";
 
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  ReferenceLine,
+  LineChart, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, ReferenceLine,
 } from "recharts";
-import { DailyMetric, toEngagementRateSeries } from "@/lib/analytics-data";
+
+export interface EngagementPoint {
+  date: string;
+  engagement: number;
+  likes: number;
+  comments: number;
+}
 
 function CustomTooltip({
-  active,
-  payload,
-  label,
+  active, payload, label,
 }: {
   active?: boolean;
   payload?: { value: number }[];
@@ -30,9 +28,17 @@ function CustomTooltip({
   );
 }
 
-export function EngagementChart({ data }: { data: DailyMetric[] }) {
-  const series = toEngagementRateSeries(data);
-  const avg    = +(series.reduce((s, d) => s + d.rate, 0) / series.length).toFixed(2);
+interface Props {
+  trend: EngagementPoint[];
+}
+
+export function EngagementChart({ trend }: Props) {
+  if (!trend.length) return <p className="text-sm text-muted-foreground/50">Sin datos</p>;
+
+  const avg = +(trend.reduce((s, d) => s + d.engagement, 0) / trend.length).toFixed(2);
+
+  // Map to chart-friendly shape
+  const series = trend.map((d) => ({ date: d.date, rate: d.engagement }));
 
   return (
     <ResponsiveContainer width="100%" height={220}>
@@ -44,11 +50,7 @@ export function EngagementChart({ data }: { data: DailyMetric[] }) {
           </linearGradient>
         </defs>
 
-        <CartesianGrid
-          strokeDasharray="3 3"
-          stroke="rgba(255,255,255,0.05)"
-          vertical={false}
-        />
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
         <XAxis
           dataKey="date"
           tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 11 }}
@@ -65,7 +67,6 @@ export function EngagementChart({ data }: { data: DailyMetric[] }) {
         />
         <Tooltip content={<CustomTooltip />} cursor={{ stroke: "rgba(255,255,255,0.1)" }} />
 
-        {/* Average reference line */}
         <ReferenceLine
           y={avg}
           stroke="rgba(244,114,182,0.35)"
