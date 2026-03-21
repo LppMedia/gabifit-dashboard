@@ -24,6 +24,16 @@ export interface VideoTranscript {
   fetchedAt: string;       // ISO
 }
 
+// ─── GabiFit full-script section ──────────────────────────────────────────────
+export interface GabifitScriptSection {
+  label:        string;    // e.g. "Hook", "Problema", "Solución", "CTA"
+  emoji:        string;    // e.g. "🎣", "😤", "💡", "📲"
+  durationHint: string;    // e.g. "0:00-0:05"
+  script:       string;    // exact words Gabi would say
+  visualNotes:  string;    // camera / editing / B-roll notes
+}
+
+// ─── AI analysis result ────────────────────────────────────────────────────────
 export interface VideoAnalysis {
   postUrl: string;
   hook: {
@@ -46,9 +56,12 @@ export interface VideoAnalysis {
     suggestedHook: string;
     suggestedCTA: string;
   };
+  // Full rewritten script — present when mode:"full_script" was requested
+  gabifitScript?: GabifitScriptSection[];
   analyzedAt: string;      // ISO
 }
 
+// ─── Scraped data store record ────────────────────────────────────────────────
 export interface CompetitorScrapedData {
   competitorId: string;
   handle: string;
@@ -56,4 +69,27 @@ export interface CompetitorScrapedData {
   scrapedAt: string;       // ISO
   transcripts: Record<string, VideoTranscript>;   // postUrl → transcript
   analyses: Record<string, VideoAnalysis>;         // postUrl → analysis
+}
+
+// ─── Scrape API response (new shape that includes follower count) ──────────────
+export interface ScrapeApiResponse {
+  posts:     ScrapedPost[];
+  followers: number | null;
+}
+
+// ─── URL Drop Analyzer ────────────────────────────────────────────────────────
+export type UrlAnalyzerStep =
+  | "idle"
+  | "scraping"
+  | "transcribing"
+  | "analyzing"
+  | "done"
+  | "error";
+
+export interface UrlAnalyzerState {
+  step:       UrlAnalyzerStep;
+  post:       ScrapedPost | null;
+  transcript: VideoTranscript | null;
+  analysis:   VideoAnalysis | null;
+  error:      string | null;
 }

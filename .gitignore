@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local dev
+.claude/settings.local.json
+dev-server.log
+test_anthropic.py

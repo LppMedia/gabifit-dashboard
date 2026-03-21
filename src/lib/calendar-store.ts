@@ -1,90 +1,139 @@
 "use client";
 
-/**
- * calendar-store.ts
- *
- * Client-side persistence for calendar posts via localStorage.
- *
- * TODO (Supabase migration): Replace the localStorage read/write in
- * `persist()` and the `useEffect` initialiser with Supabase calls.
- * The hook interface (addPost / updatePost / deletePost) stays identical,
- * so no component changes are needed.
- */
-
 import { useState, useEffect, useCallback } from "react";
-import { CalendarPost, CALENDAR_POSTS } from "./calendar-data";
+import { CalendarPost } from "./calendar-data";
+import { createClient } from "@/lib/supabase/client";
 
-const STORAGE_KEY = "gabifit-calendar-v2";
-
-function load(): CalendarPost[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as CalendarPost[];
-  } catch {}
-  return CALENDAR_POSTS; // fall back to seed data
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function fromRow(row: any): CalendarPost {
+  return {
+    id:         row.id,
+    date:       row.date,
+    time:       row.time,
+    platform:   row.platform,
+    type:       row.type,
+    status:     row.status,
+    caption:    row.caption,
+    format:     row.format,
+    hashtags:   row.hashtags ?? undefined,
+    script:     row.script ?? undefined,
+    mediaFiles: row.media_files
+      ? (row.media_files as CalendarPost["mediaFiles"])
+      : undefined,
+    notes:      row.notes ?? undefined,
+    engagement: row.engagement ?? undefined,
+  };
 }
 
-function save(posts: CalendarPost[]) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(posts));
-  } catch {
-    // Storage quota exceeded — silently ignore for now
-  }
+function toInsert(post: Omit<CalendarPost, "id">, userId: string) {
+  // Strip `url` from mediaFiles — object URLs are session-only
+  const mediaFiles = post.mediaFiles
+    ? post.mediaFiles.map(({ url: _url, ...meta }) => meta)
+    : null;
+
+  return {
+    id:          `c${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    user_id:     userId,
+    date:        post.date,
+    time:        post.time,
+    platform:    post.platform,
+    type:        post.type,
+    status:      post.status,
+    caption:     post.caption,
+    format:      post.format,
+    hashtags:    post.hashtags ?? null,
+    script:      post.script ?? null,
+    media_files: mediaFiles,
+    notes:       post.notes ?? null,
+    engagement:  post.engagement ?? null,
+  };
 }
 
 export function useCalendarPosts() {
   const [posts, setPosts]       = useState<CalendarPost[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  const supabase = createClient();
 
-  // Hydrate once on mount
   useEffect(() => {
-    const stored = load();
-    // Merge seed data so new seed posts appear even after prior localStorage writes
-    const storedIds = new Set(stored.map((p) => p.id));
-    const merged    = [
-      ...stored,
-      ...CALENDAR_POSTS.filter((p) => !storedIds.has(p.id)),
-    ];
-    setPosts(merged);
-    save(merged);
-    setHydrated(true);
-  }, []);
+    let active = true;
+    async function init() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setHydrated(true); return; }
 
-  // Updater that keeps state + storage in sync
-  const persist = useCallback((updater: (prev: CalendarPost[]) => CalendarPost[]) => {
-    setPosts((prev) => {
-      const next = updater(prev);
-      save(next);
-      return next;
-    });
+      const { data } = await supabase
+        .from("calendar_posts")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("date", { ascending: true });
+
+      if (active) {
+        setPosts((data ?? []).map(fromRow));
+        setHydrated(true);
+      }
+    }
+    init();
+    return () => { active = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const addPost = useCallback(
-    (post: Omit<CalendarPost, "id">): CalendarPost => {
-      const newPost: CalendarPost = {
-        ...post,
-        id: `c${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      };
-      persist((prev) => [...prev, newPost]);
-      return newPost;
+    async (post: Omit<CalendarPost, "id">): Promise<CalendarPost> => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        const fallback: CalendarPost = {
+          ...post,
+          id: `c${Date.now()}`,
+        };
+        return fallback;
+      }
+
+      const row = toInsert(post, user.id);
+      const { data, error } = await supabase
+        .from("calendar_posts")
+        .insert(row)
+        .select()
+        .single();
+
+      const result = !error && data ? fromRow(data) : { ...post, id: row.id };
+      setPosts((prev) => [...prev, result]);
+      return result;
     },
-    [persist]
+    [supabase]
   );
 
   const updatePost = useCallback(
-    (id: string, updates: Partial<CalendarPost>) => {
-      persist((prev) =>
+    async (id: string, updates: Partial<CalendarPost>) => {
+      setPosts((prev) =>
         prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
       );
+
+      const dbUpdates: Record<string, unknown> = {};
+      if (updates.date       !== undefined) dbUpdates.date        = updates.date;
+      if (updates.time       !== undefined) dbUpdates.time        = updates.time;
+      if (updates.platform   !== undefined) dbUpdates.platform    = updates.platform;
+      if (updates.type       !== undefined) dbUpdates.type        = updates.type;
+      if (updates.status     !== undefined) dbUpdates.status      = updates.status;
+      if (updates.caption    !== undefined) dbUpdates.caption     = updates.caption;
+      if (updates.format     !== undefined) dbUpdates.format      = updates.format;
+      if (updates.hashtags   !== undefined) dbUpdates.hashtags    = updates.hashtags;
+      if (updates.script     !== undefined) dbUpdates.script      = updates.script;
+      if (updates.notes      !== undefined) dbUpdates.notes       = updates.notes;
+      if (updates.engagement !== undefined) dbUpdates.engagement  = updates.engagement;
+      if (updates.mediaFiles !== undefined) {
+        dbUpdates.media_files = updates.mediaFiles?.map(({ url: _url, ...meta }) => meta) ?? null;
+      }
+
+      await supabase.from("calendar_posts").update(dbUpdates).eq("id", id);
     },
-    [persist]
+    [supabase]
   );
 
   const deletePost = useCallback(
-    (id: string) => {
-      persist((prev) => prev.filter((p) => p.id !== id));
+    async (id: string) => {
+      setPosts((prev) => prev.filter((p) => p.id !== id));
+      await supabase.from("calendar_posts").delete().eq("id", id);
     },
-    [persist]
+    [supabase]
   );
 
   return { posts, hydrated, addPost, updatePost, deletePost };

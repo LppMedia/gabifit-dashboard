@@ -11,6 +11,7 @@ import {
   Zap,
   Instagram,
   AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -32,7 +33,9 @@ import { AddCompetitorDialog } from "@/components/competitors/AddCompetitorDialo
 import { useScrapedData } from "@/lib/scraped-store";
 import { ScrapedVideoCard } from "@/components/competitors/ScrapedVideoCard";
 import { LiveAnalysisModal } from "@/components/competitors/LiveAnalysisModal";
-import { ScrapedPost } from "@/lib/scraped-types";
+import { UrlDropAnalyzer } from "@/components/competitors/UrlDropAnalyzer";
+import { ScrapedPost, VideoAnalysis } from "@/lib/scraped-types";
+import { useCalendarPosts } from "@/lib/calendar-store";
 
 // ─── Skeleton ──────────────────────────────────────────────────────────────────
 function CardSkeleton() {
@@ -119,6 +122,7 @@ export default function CompetitorsPage() {
     isRefreshingAll,
     addCompetitor,
     removeCompetitor,
+    updateFollowers,
     refreshCompetitor,
     refreshAll,
   } = useCompetitors();
@@ -134,12 +138,16 @@ export default function CompetitorsPage() {
     analyzePost,
   } = useScrapedData();
 
+  const { addPost: addCalendarPost } = useCalendarPosts();
+
   const [selectedPost, setSelectedPost] = useState<CompetitorPost | null>(null);
   const [selectedCompetitor, setSelectedCompetitor] =
     useState<Competitor | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [livePost, setLivePost] = useState<ScrapedPost | null>(null);
   const [liveCompetitorId, setLiveCompetitorId] = useState<string | null>(null);
+  const [liveInitialTab, setLiveInitialTab] = useState<"video"|"transcript"|"estructura"|"adaptar">("video");
+  const [calendarBanner, setCalendarBanner] = useState(false);
 
   const allPosts = getAllPosts(competitors);
 
@@ -180,8 +188,45 @@ export default function CompetitorsPage() {
     setSelectedCompetitor(null);
   }
 
+  function handleSendToCalendar(post: ScrapedPost, analysis: VideoAnalysis) {
+    const today = new Date();
+    const caption = [
+      analysis.gabifitAdaptation.suggestedHook,
+      "",
+      ...analysis.gabifitAdaptation.tips.map((t, i) => `${i + 1}. ${t}`),
+      "",
+      analysis.gabifitAdaptation.suggestedCTA,
+    ].join("\n");
+
+    addCalendarPost({
+      date:     today.toISOString().split("T")[0],
+      time:     "10:00",
+      platform: "instagram",
+      type:     "viralidad",
+      status:   "draft",
+      caption,
+      format:   post.type === "Video" ? "Reel" : post.type === "Sidecar" ? "Carrusel" : "Post",
+      hashtags: post.caption.match(/#\w+/g)?.slice(0, 5).join(" ") ?? "",
+      notes:    `Inspirado en @${post.ownerUsername} · ${post.url}\n\nHook original: ${analysis.hook.text}`,
+      script:   analysis.structure.map((s) => `[${s.time}] ${s.section}: ${s.description}`).join("\n"),
+    });
+
+    setLivePost(null);
+    setLiveCompetitorId(null);
+    setCalendarBanner(true);
+    setTimeout(() => setCalendarBanner(false), 3500);
+  }
+
   return (
     <div className="flex flex-col gap-6 p-6">
+      {/* ── Calendar success banner ─────────────────────────────────────────── */}
+      {calendarBanner && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-5 py-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-sm font-medium shadow-xl backdrop-blur-sm animate-in fade-in slide-in-from-bottom-4">
+          <CheckCircle2 className="h-4 w-4" />
+          Adaptación enviada al Calendario como borrador ✨
+        </div>
+      )}
+
       {/* ── Page header ──────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
@@ -340,7 +385,7 @@ export default function CompetitorsPage() {
           <div className="flex items-center gap-2 mb-4">
             <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
               <Instagram className="h-4 w-4 text-pink-400" />
-              Top Videos en Vivo — Instagram
+              Top 10 Contenido del Último Mes — Instagram
             </h2>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-pink-500/15 border border-pink-500/25 text-pink-400 font-medium">
               Powered by Apify
@@ -394,7 +439,9 @@ export default function CompetitorsPage() {
                         )}
                         <button
                           onClick={() =>
-                            scrapeCompetitor(competitor.id, igHandle)
+                            scrapeCompetitor(competitor.id, igHandle, (followers) =>
+                              updateFollowers(competitor.id, followers)
+                            )
                           }
                           disabled={isScraping}
                           className={cn(
@@ -442,13 +489,13 @@ export default function CompetitorsPage() {
 
                     {/* Scraping skeleton */}
                     {isScraping && (
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                        {[1, 2, 3, 4].map((i) => (
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                        {[1, 2, 3, 4, 5].map((i) => (
                           <div
                             key={i}
                             className="rounded-xl overflow-hidden border border-border/30 animate-pulse"
                           >
-                            <div className="aspect-video bg-white/[0.05]" />
+                            <div className="bg-white/[0.05]" style={{ aspectRatio: "4/5" }} />
                             <div className="p-3 space-y-2">
                               <div className="h-3 bg-white/[0.05] rounded w-3/4" />
                               <div className="h-3 bg-white/[0.04] rounded w-1/2" />
@@ -458,17 +505,20 @@ export default function CompetitorsPage() {
                       </div>
                     )}
 
-                    {/* Scraped video grid */}
+                    {/* Scraped video grid — top 9 best posts, 3 columns for visual richness */}
                     {scraped && scraped.posts.length > 0 && (
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                        {scraped.posts.slice(0, 12).map((post) => (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {scraped.posts.slice(0, 9).map((post, idx) => (
                           <ScrapedVideoCard
                             key={post.id}
                             post={post}
+                            rank={idx + 1}
                             competitorId={competitor.id}
-                            onOpenAnalysis={(p) => {
+                            analysis={scrapedDataMap[competitor.id]?.analyses[post.url] ?? null}
+                            onOpenAnalysis={(p, tab) => {
                               setLivePost(p);
                               setLiveCompetitorId(competitor.id);
+                              if (tab) setLiveInitialTab(tab);
                             }}
                           />
                         ))}
@@ -484,6 +534,13 @@ export default function CompetitorsPage() {
                 );
               })}
           </div>
+        </section>
+      )}
+
+      {/* ── URL Drop Analyzer ─────────────────────────────────────────────────── */}
+      {hydrated && (
+        <section>
+          <UrlDropAnalyzer onSendToCalendar={handleSendToCalendar} />
         </section>
       )}
 
@@ -534,15 +591,18 @@ export default function CompetitorsPage() {
       <LiveAnalysisModal
         post={livePost}
         competitorId={liveCompetitorId}
+        initialTab={liveInitialTab}
         scrapedData={
           liveCompetitorId ? (scrapedDataMap[liveCompetitorId] ?? null) : null
         }
         onClose={() => {
           setLivePost(null);
           setLiveCompetitorId(null);
+          setLiveInitialTab("video");
         }}
         onFetchTranscript={fetchTranscript}
         onAnalyze={analyzePost}
+        onSendToCalendar={handleSendToCalendar}
         transcribing={transcribing}
         analyzing={analyzing}
         errors={scrapedErrors}

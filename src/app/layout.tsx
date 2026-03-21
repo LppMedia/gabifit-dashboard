@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Barlow, Barlow_Condensed } from "next/font/google";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { SessionProvider } from "@/components/providers/SessionProvider";
 
 // Body — Barlow for clean, athletic readability
 const barlow = Barlow({
@@ -31,7 +32,9 @@ export default function RootLayout({
       <body
         className={`${barlow.variable} ${barlowCondensed.variable} antialiased bg-background text-foreground`}
       >
-        <TooltipProvider delay={300}>{children}</TooltipProvider>
+        <SessionProvider>
+          <TooltipProvider delay={300}>{children}</TooltipProvider>
+        </SessionProvider>
       </body>
     </html>
   );

@@ -11,9 +11,11 @@ import {
   LayoutDashboard,
   ChevronRight,
   Zap,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
+import { useSession } from "@/components/providers/SessionProvider";
 
 // ─── Nav items ────────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
@@ -70,6 +72,12 @@ const NAV_ITEMS = [
 // ─── Component ────────────────────────────────────────────────────────────────
 export function Sidebar() {
   const pathname = usePathname();
+  const { profile, signOut } = useSession();
+
+  const displayName = profile?.full_name || "Gabi Fit";
+  const displayRole = profile?.role || "Content Manager";
+  const initials = profile?.avatar_initials ||
+    displayName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase() || "GF";
 
   return (
     <aside className="relative flex h-screen w-60 flex-col overflow-hidden border-r border-border/50 bg-sidebar">
@@ -161,17 +169,24 @@ export function Sidebar() {
         <div className="flex items-center gap-3 rounded-xl border border-border/30 bg-white/[0.03] px-3 py-2.5 backdrop-blur-sm">
           {/* Avatar with online indicator */}
           <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 to-violet-500 text-[11px] font-bold text-white shadow-md shadow-pink-500/20">
-            GF
+            {initials}
             <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-[2px] border-sidebar bg-emerald-400" />
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-[12px] font-semibold leading-none text-foreground">
-              Gabi Fit
+              {displayName}
             </p>
             <p className="mt-0.5 truncate text-[10px] text-muted-foreground/60">
-              Content Manager
+              {displayRole}
             </p>
           </div>
+          <button
+            onClick={signOut}
+            title="Cerrar sesión"
+            className="shrink-0 rounded-lg p-1.5 text-muted-foreground/40 transition-colors hover:bg-white/5 hover:text-muted-foreground"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+          </button>
         </div>
         <p className="mt-2.5 text-center text-[9px] font-medium uppercase tracking-[0.18em] text-muted-foreground/25">
           v0.1

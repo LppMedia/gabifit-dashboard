@@ -6,48 +6,75 @@ import {
   VideoTranscript,
   VideoAnalysis,
 } from "./scraped-types";
-
-const STORAGE_KEY = "gabifit-scraped-v1";
-
-function load(): Record<string, CompetitorScrapedData> {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return {};
-}
+import { createClient } from "@/lib/supabase/client";
 
 export function useScrapedData() {
-  const [data, setData] = useState<Record<string, CompetitorScrapedData>>({});
-  const [hydrated, setHydrated] = useState(false);
-  const [scraping, setScraping] = useState<Set<string>>(new Set());
+  const [data, setData]             = useState<Record<string, CompetitorScrapedData>>({});
+  const [hydrated, setHydrated]     = useState(false);
+  const [scraping, setScraping]     = useState<Set<string>>(new Set());
   const [transcribing, setTranscribing] = useState<Set<string>>(new Set());
-  const [analyzing, setAnalyzing] = useState<Set<string>>(new Set());
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [analyzing, setAnalyzing]   = useState<Set<string>>(new Set());
+  const [errors, setErrors]         = useState<Record<string, string>>({});
+  const supabase = createClient();
 
   useEffect(() => {
-    setData(load());
-    setHydrated(true);
+    let active = true;
+    async function init() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setHydrated(true); return; }
+
+      const { data: rows } = await supabase
+        .from("competitor_scraped_data")
+        .select("*")
+        .eq("user_id", user.id);
+
+      if (active) {
+        const map: Record<string, CompetitorScrapedData> = {};
+        for (const row of rows ?? []) {
+          map[row.competitor_id] = {
+            competitorId: row.competitor_id,
+            handle:       row.handle,
+            posts:        row.posts ?? [],
+            scrapedAt:    row.scraped_at,
+            transcripts:  row.transcripts ?? {},
+            analyses:     row.analyses ?? {},
+          };
+        }
+        setData(map);
+        setHydrated(true);
+      }
+    }
+    init();
+    return () => { active = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const persist = useCallback(
-    (next: Record<string, CompetitorScrapedData>) => {
-      setData(next);
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      } catch {}
+  // Upsert a full scraped data record to DB
+  const persistToDB = useCallback(
+    async (record: CompetitorScrapedData) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      await supabase.from("competitor_scraped_data").upsert({
+        competitor_id: record.competitorId,
+        user_id:       user.id,
+        handle:        record.handle,
+        posts:         record.posts,
+        transcripts:   record.transcripts,
+        analyses:      record.analyses,
+        scraped_at:    record.scrapedAt,
+      });
     },
-    []
+    [supabase]
   );
 
   const scrapeCompetitor = useCallback(
-    async (competitorId: string, handle: string) => {
+    async (
+      competitorId: string,
+      handle: string,
+      onFollowersUpdate?: (followers: number) => void
+    ) => {
       setScraping((prev) => new Set(prev).add(competitorId));
-      setErrors((prev) => {
-        const n = { ...prev };
-        delete n[competitorId];
-        return n;
-      });
+      setErrors((prev) => { const n = { ...prev }; delete n[competitorId]; return n; });
       try {
         const res = await fetch("/api/competitors/scrape", {
           method: "POST",
@@ -58,50 +85,44 @@ export function useScrapedData() {
           const err = await res.json().catch(() => ({ error: "Error desconocido" }));
           throw new Error(err.error ?? `HTTP ${res.status}`);
         }
-        const posts = await res.json();
+        const { posts, followers } = await res.json();
+        if (followers != null && onFollowersUpdate) {
+          onFollowersUpdate(followers);
+        }
         setData((current) => {
           const scraped: CompetitorScrapedData = {
             competitorId,
             handle,
             posts,
-            scrapedAt: new Date().toISOString(),
+            scrapedAt:   new Date().toISOString(),
             transcripts: current[competitorId]?.transcripts ?? {},
-            analyses: current[competitorId]?.analyses ?? {},
+            analyses:    current[competitorId]?.analyses ?? {},
           };
           const next = { ...current, [competitorId]: scraped };
-          try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-          } catch {}
+          persistToDB(scraped);
           return next;
         });
       } catch (err: unknown) {
-        const message =
-          err instanceof Error ? err.message : "Error al scrapear";
+        const message = err instanceof Error ? err.message : "Error al scrapear";
         setErrors((prev) => ({ ...prev, [competitorId]: message }));
       } finally {
-        setScraping((prev) => {
-          const n = new Set(prev);
-          n.delete(competitorId);
-          return n;
-        });
+        setScraping((prev) => { const n = new Set(prev); n.delete(competitorId); return n; });
       }
     },
-    []
+    [persistToDB]
   );
 
   const fetchTranscript = useCallback(
-    async (competitorId: string, postUrl: string) => {
+    async (competitorId: string, postUrl: string, videoUrl?: string) => {
       setTranscribing((prev) => new Set(prev).add(postUrl));
-      setErrors((prev) => {
-        const n = { ...prev };
-        delete n[`transcript-${postUrl}`];
-        return n;
-      });
+      setErrors((prev) => { const n = { ...prev }; delete n[`transcript-${postUrl}`]; return n; });
       try {
+        // Prefer the actual video file URL for transcription; fall back to the post URL
+        const urlForTranscript = videoUrl ?? postUrl;
         const res = await fetch("/api/competitors/transcript", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ videoUrl: postUrl }),
+          body: JSON.stringify({ videoUrl: urlForTranscript }),
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({ error: "Error" }));
@@ -116,27 +137,17 @@ export function useScrapedData() {
             transcripts: { ...existing.transcripts, [postUrl]: transcript },
           };
           const next = { ...current, [competitorId]: updated };
-          try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-          } catch {}
+          persistToDB(updated);
           return next;
         });
       } catch (err: unknown) {
-        const message =
-          err instanceof Error ? err.message : "Error en transcripción";
-        setErrors((prev) => ({
-          ...prev,
-          [`transcript-${postUrl}`]: message,
-        }));
+        const message = err instanceof Error ? err.message : "Error en transcripción";
+        setErrors((prev) => ({ ...prev, [`transcript-${postUrl}`]: message }));
       } finally {
-        setTranscribing((prev) => {
-          const n = new Set(prev);
-          n.delete(postUrl);
-          return n;
-        });
+        setTranscribing((prev) => { const n = new Set(prev); n.delete(postUrl); return n; });
       }
     },
-    []
+    [persistToDB]
   );
 
   const analyzePost = useCallback(
@@ -145,19 +156,16 @@ export function useScrapedData() {
       postUrl: string,
       transcript: string,
       caption: string,
-      handle: string
+      handle: string,
+      mode?: string
     ) => {
       setAnalyzing((prev) => new Set(prev).add(postUrl));
-      setErrors((prev) => {
-        const n = { ...prev };
-        delete n[`analyze-${postUrl}`];
-        return n;
-      });
+      setErrors((prev) => { const n = { ...prev }; delete n[`analyze-${postUrl}`]; return n; });
       try {
         const res = await fetch("/api/competitors/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ postUrl, transcript, caption, handle }),
+          body: JSON.stringify({ postUrl, transcript, caption, handle, mode }),
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({ error: "Error" }));
@@ -172,39 +180,32 @@ export function useScrapedData() {
             analyses: { ...existing.analyses, [postUrl]: analysis },
           };
           const next = { ...current, [competitorId]: updated };
-          try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-          } catch {}
+          persistToDB(updated);
           return next;
         });
       } catch (err: unknown) {
-        const message =
-          err instanceof Error ? err.message : "Error en análisis";
-        setErrors((prev) => ({
-          ...prev,
-          [`analyze-${postUrl}`]: message,
-        }));
+        const message = err instanceof Error ? err.message : "Error en análisis";
+        setErrors((prev) => ({ ...prev, [`analyze-${postUrl}`]: message }));
       } finally {
-        setAnalyzing((prev) => {
-          const n = new Set(prev);
-          n.delete(postUrl);
-          return n;
-        });
+        setAnalyzing((prev) => { const n = new Set(prev); n.delete(postUrl); return n; });
       }
     },
-    []
+    [persistToDB]
   );
 
   const clearCompetitorData = useCallback(
-    (competitorId: string) => {
+    async (competitorId: string) => {
       setData((current) => {
         const next = { ...current };
         delete next[competitorId];
-        persist(next);
         return next;
       });
+      await supabase
+        .from("competitor_scraped_data")
+        .delete()
+        .eq("competitor_id", competitorId);
     },
-    [persist]
+    [supabase]
   );
 
   return {
