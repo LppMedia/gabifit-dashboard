@@ -27,6 +27,10 @@ import { useIgProfile, computeAnalytics } from "@/lib/instagram-profile-store";
 import { formatNumber } from "@/lib/analytics-data";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import type { WeeklyReport, ContentPlan } from "@/lib/weekly-review-types";
+import { WeeklyReportBlock } from "@/components/instagram/WeeklyReportBlock";
+import { ContentPlanPreview } from "@/components/instagram/ContentPlanPreview";
+import { CalendarFillModal } from "@/components/instagram/CalendarFillModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface WeeklyPost {
@@ -414,6 +418,14 @@ export default function InstagramPage() {
   const [search, setSearch]                 = useState("");
   const [dialogOpen, setDialogOpen]         = useState(false);
   const [editPost, setEditPost]             = useState<InstagramPost | null>(null);
+  const [planScope, setPlanScope]         = useState<"week" | "month">("week");
+  const [planMonth, setPlanMonth]         = useState(() => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [weeklyReport, setWeeklyReport]   = useState<WeeklyReport | null>(null);
+  const [contentPlan,  setContentPlan]    = useState<ContentPlan  | null>(null);
+  const [fillModalOpen, setFillModalOpen] = useState(false);
 
   // Load latest saved plan from Supabase on mount so it persists after refresh
   useEffect(() => {
@@ -435,6 +447,10 @@ export default function InstagramPage() {
           const map: Record<string, PostAnalysis> = {};
           (savedAnalysis.postAnalyses ?? []).forEach((pa) => { map[pa.shortCode] = pa; });
           setPaMap(map);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if ((savedAnalysis as any).weeklyReport) setWeeklyReport((savedAnalysis as any).weeklyReport);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if ((savedAnalysis as any).contentPlan)  setContentPlan((savedAnalysis as any).contentPlan);
           setPlanStep("done");
           setPlanLoadedAt(data.scraped_at ?? null);
         }
@@ -484,14 +500,23 @@ export default function InstagramPage() {
       const r = await fetch("/api/weekly-review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ posts: profile.posts, handle: profile.username }),
+        body: JSON.stringify({
+          posts:  profile.posts,
+          handle: profile.username,
+          scope:  planScope,
+          month:  planMonth,
+        }),
       });
       if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { error?: string }).error ?? "Error IA");
-      const data: WeeklyAnalysis = await r.json();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data: WeeklyAnalysis & Record<string, any> = await r.json();
 
       const map: Record<string, PostAnalysis> = {};
       (data.postAnalyses ?? []).forEach((pa) => { map[pa.shortCode] = pa; });
       setPaMap(map);
+
+      if (data.weeklyReport) setWeeklyReport(data.weeklyReport as WeeklyReport);
+      if (data.contentPlan)  setContentPlan(data.contentPlan  as ContentPlan);
 
       setPlanStep("saving");
       const supabase = createClient();
@@ -501,11 +526,11 @@ export default function InstagramPage() {
         ws.setDate(ws.getDate() - ws.getDay());
         ws.setHours(0, 0, 0, 0);
         await supabase.from("weekly_reviews").upsert({
-          user_id: user.id,
+          user_id:         user.id,
           week_start_date: ws.toISOString().split("T")[0],
-          posts: profile.posts,
-          analysis: data,
-          scraped_at: new Date().toISOString(),
+          posts:           profile.posts,
+          analysis:        data,
+          scraped_at:      new Date().toISOString(),
         });
       }
 
@@ -705,6 +730,24 @@ export default function InstagramPage() {
           {/* ══════════════ TAB 3: PLAN SEMANAL ══════════════ */}
           <TabsContent value="plan" className="mt-4">
             <div className="flex flex-col gap-6">
+              {/* Scope selector */}
+              <div className="flex items-center gap-1 rounded-xl border border-border/40 bg-card p-1 w-fit">
+                {(["week", "month"] as const).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setPlanScope(s)}
+                    className={cn(
+                      "rounded-lg px-4 py-2 text-[12px] font-semibold transition-colors",
+                      planScope === s
+                        ? "bg-lime-600 text-black shadow-sm"
+                        : "text-muted-foreground/60 hover:text-foreground"
+                    )}
+                  >
+                    {s === "week" ? "Esta semana (7 días)" : "Este mes (4 semanas)"}
+                  </button>
+                ))}
+              </div>
+
               {/* Hero / generate section */}
               {planStep !== "done" && (
                 <div className="relative overflow-hidden rounded-2xl border border-lime-500/20 bg-card px-8 py-8">
@@ -731,7 +774,7 @@ export default function InstagramPage() {
                     ) : planStep === "analyzing" || planStep === "saving" ? (
                       <div className="flex items-center gap-3 text-[13px] text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin text-lime-400" />
-                        {planStep === "analyzing" ? "Analizando posts con IA..." : "Guardando en Supabase..."}
+                        {planStep === "analyzing" ? "Analizando con IA... (30-60 seg)" : "Guardando análisis..."}
                       </div>
                     ) : planStep === "error" ? (
                       <div className="flex flex-col gap-3">
@@ -743,7 +786,7 @@ export default function InstagramPage() {
                     ) : (
                       <Button onClick={generatePlan}
                         className="w-fit gap-2 bg-gradient-to-r from-lime-500 to-emerald-500 text-black font-semibold shadow-lg shadow-lime-500/25 hover:opacity-90">
-                        <Sparkles className="h-4 w-4" />Generar Plan Semanal
+                        <Sparkles className="h-4 w-4" />Generar Reporte + Plan
                       </Button>
                     )}
                   </div>
@@ -753,6 +796,17 @@ export default function InstagramPage() {
               {/* Analysis results */}
               {wa && planStep === "done" && (
                 <div className="flex flex-col gap-5">
+                  {/* Bloque 1 — Weekly Report */}
+                  {weeklyReport && <WeeklyReportBlock report={weeklyReport} />}
+
+                  {/* Bloque 2 — Content Plan Preview */}
+                  {contentPlan && (
+                    <ContentPlanPreview
+                      contentPlan={contentPlan}
+                      onConfirm={() => setFillModalOpen(true)}
+                    />
+                  )}
+
                   {/* KPI row */}
                   <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                     {[
@@ -1032,7 +1086,7 @@ export default function InstagramPage() {
                       </p>
                     )}
                     <div className="ml-auto">
-                      <Button variant="outline" onClick={() => { setPlanStep("idle"); setWeeklyAnalysis(null); setPaMap({}); }}
+                      <Button variant="outline" onClick={() => { setPlanStep("idle"); setWeeklyAnalysis(null); setPaMap({}); setWeeklyReport(null); setContentPlan(null); }}
                         className="gap-2 text-[12px]">
                         <RefreshCw className="h-3.5 w-3.5" />Nueva Revisión
                       </Button>
@@ -1141,6 +1195,14 @@ export default function InstagramPage() {
         editPost={editPost}
         onSave={handleSave}
       />
+
+      {contentPlan && (
+        <CalendarFillModal
+          open={fillModalOpen}
+          onOpenChange={setFillModalOpen}
+          contentPlan={contentPlan}
+        />
+      )}
     </>
   );
 }
