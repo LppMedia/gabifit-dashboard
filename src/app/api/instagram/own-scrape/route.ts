@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
 
       // Normalize posts
       const rawPosts = profile.latestPosts || profile.posts || [];
-      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
 
       const posts = rawPosts
         .map((p: Record<string, unknown>) => ({
@@ -69,7 +69,11 @@ export async function POST(req: NextRequest) {
           displayUrl: (p.displayUrl || p.display_url || p.thumbnailUrl || "") as string,
           videoUrl: (p.videoUrl || p.video_url || "") as string,
         }))
-        .filter((p: { timestamp: string }) => new Date(p.timestamp).getTime() > sevenDaysAgo);
+        .filter((p: { timestamp: string }) => new Date(p.timestamp).getTime() > thirtyDaysAgo)
+        .sort((a: { timestamp: string }, b: { timestamp: string }) =>
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        )
+        .slice(0, 20);
 
       return NextResponse.json({
         username: profile.username || username,
