@@ -19,8 +19,8 @@ interface PostRow extends ContentPlanPost {
   selected: boolean;
 }
 
-function makeId(i: number) {
-  return `ai${Date.now() + i}-${Math.random().toString(36).slice(2, 9)}`;
+function makeId() {
+  return crypto.randomUUID();
 }
 
 export function CalendarFillModal({ open, onOpenChange, contentPlan }: Props) {
@@ -32,17 +32,21 @@ export function CalendarFillModal({ open, onOpenChange, contentPlan }: Props) {
 
   useEffect(() => {
     if (!open) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    let cancelled = false;
     setLoading(true);
     setToast(null);
 
     async function detectConflicts() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
+      if (cancelled) return;
       if (!user) { setLoading(false); return; }
 
       const allPlanPosts = contentPlan.semanas.flatMap((w) => w.posts);
-      if (!allPlanPosts.length) { setRows([]); setLoading(false); return; }
+      if (!allPlanPosts.length) {
+        if (!cancelled) { setRows([]); setLoading(false); }
+        return;
+      }
 
       const dates      = allPlanPosts.map((p) => p.fecha);
       const rangeStart = dates.reduce((a, b) => (a < b ? a : b));
@@ -54,6 +58,8 @@ export function CalendarFillModal({ open, onOpenChange, contentPlan }: Props) {
         .gte("date", rangeStart)
         .lte("date", rangeEnd)
         .eq("user_id", user.id);
+
+      if (cancelled) return;
 
       const occupiedDates = new Set<string>((existing ?? []).map((r) => r.date as string));
 
@@ -68,6 +74,7 @@ export function CalendarFillModal({ open, onOpenChange, contentPlan }: Props) {
     }
 
     detectConflicts();
+    return () => { cancelled = true; };
   }, [open, contentPlan]);
 
   function toggleRow(index: number) {
@@ -78,43 +85,48 @@ export function CalendarFillModal({ open, onOpenChange, contentPlan }: Props) {
 
   async function handleFill() {
     setFilling(true);
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setFilling(false); return; }
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    const selected = rows.filter((r) => r.selected);
-    if (!selected.length) { setFilling(false); return; }
+      const selected = rows.filter((r) => r.selected);
+      if (!selected.length) return;
 
-    const toInsert = selected.map((p, i) => ({
-      id:          makeId(i),
-      user_id:     user.id,
-      date:        p.fecha,
-      time:        "09:00",
-      platform:    p.plataforma,
-      type:        p.tipo,
-      status:      "scheduled",
-      caption:     p.caption,
-      format:      p.formato,
-      hashtags:    null,
-      script:      null,
-      notes:       p.hook ? `Hook: ${p.hook}\nCTA: ${p.cta}` : null,
-      media_files: null,
-      engagement:  null,
-    }));
+      const toInsert = selected.map((p) => ({
+        id:          makeId(),
+        user_id:     user.id,
+        date:        p.fecha,
+        time:        "09:00",
+        platform:    p.plataforma,
+        type:        p.tipo,
+        status:      "scheduled",
+        caption:     p.caption,
+        format:      p.formato,
+        hashtags:    null,
+        script:      null,
+        notes:       p.hook ? `Hook: ${p.hook}\nCTA: ${p.cta}` : null,
+        media_files: null,
+        engagement:  null,
+      }));
 
-    const { error } = await supabase.from("calendar_posts").insert(toInsert);
+      const { error } = await supabase.from("calendar_posts").insert(toInsert);
 
-    if (error) {
-      setToast(`Error al guardar: ${error.message}`);
+      if (error) {
+        setToast(`Error al guardar: ${error.message}`);
+        return;
+      }
+
+      setToast(`${toInsert.length} posts agregados al calendario ✓`);
+      setTimeout(() => {
+        onOpenChange(false);
+        router.push("/calendar");
+      }, 1400);
+    } catch (e) {
+      setToast(`Error de red: ${e instanceof Error ? e.message : "intenta de nuevo"}`);
+    } finally {
       setFilling(false);
-      return;
     }
-
-    setToast(`${toInsert.length} posts agregados al calendario ✓`);
-    setTimeout(() => {
-      onOpenChange(false);
-      router.push("/calendar");
-    }, 1400);
   }
 
   if (!open) return null;
