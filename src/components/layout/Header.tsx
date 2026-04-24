@@ -7,13 +7,11 @@ import { Input } from "@/components/ui/input";
 
 // ─── Route config ─────────────────────────────────────────────────────────────
 const ROUTE_META: Record<string, { title: string; subtitle: string; color: string }> = {
-  "/":            { title: "Inicio",             subtitle: "Tu hub de contenido de un vistazo",           color: "text-pink-400"    },
-  "/instagram":   { title: "Instagram",          subtitle: "Programa, borra y publica contenido",         color: "text-pink-400"    },
-  "/analytics":   { title: "Analytics",          subtitle: "Crecimiento, alcance y engagement real",      color: "text-cyan-400"    },
-  "/calendar":    { title: "Calendario",         subtitle: "Planifica tu pipeline de contenido",          color: "text-emerald-400" },
-  "/revision":    { title: "Revisión Semanal",   subtitle: "Análisis de contenido + plan para la próxima semana", color: "text-lime-400" },
-  "/competitors": { title: "Competidores",       subtitle: "Monitorea creadores y marcas con IA",         color: "text-amber-400"   },
-  "/news":        { title: "Noticias",           subtitle: "Noticias del sector con resúmenes de IA",     color: "text-sky-400"     },
+  "/":            { title: "Inicio",             subtitle: "Tu hub de contenido de un vistazo",                          color: "text-pink-400"    },
+  "/instagram":   { title: "Instagram Studio",   subtitle: "Feed · Analytics · Plan Semanal · Gestión de contenido",     color: "text-pink-400"    },
+  "/calendar":    { title: "Calendario",         subtitle: "Planifica tu pipeline de contenido",                         color: "text-emerald-400" },
+  "/competitors": { title: "Competidores",       subtitle: "Monitorea creadores y marcas con IA",                        color: "text-amber-400"   },
+  "/news":        { title: "Noticias",           subtitle: "Noticias del sector con resúmenes de IA",                    color: "text-sky-400"     },
 };
 
 const FALLBACK = { title: "Dashboard", subtitle: "GabiFit Studio", color: "text-lime-400" };
