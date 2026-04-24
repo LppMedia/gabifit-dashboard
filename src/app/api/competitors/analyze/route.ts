@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY ?? "";
-
-// Models tried in order — first available wins
-const MODELS = [
-  "claude-3-5-sonnet-latest",
-  "claude-3-5-haiku-latest",
-  "claude-3-5-sonnet-20241022",
-  "claude-3-5-haiku-20241022",
-  "claude-3-haiku-20240307",
-];
+const KIE_KEY = process.env.KIE_AI_API_KEY ?? "";
+const KIE_URL = "https://kieai.erweima.ai/api/v1/chat/completions";
+const MODEL   = "deepseek-chat";
 
 // GabiFit brand context — injected into every analysis
 const GABIFIT_CONTEXT = `
@@ -24,9 +17,9 @@ CONTEXTO DE MARCA — GABIFIT:
 `.trim();
 
 export async function POST(req: NextRequest) {
-  if (!ANTHROPIC_KEY) {
+  if (!KIE_KEY) {
     return NextResponse.json(
-      { error: "ANTHROPIC_API_KEY no configurado" },
+      { error: "KIE_AI_API_KEY no configurado" },
       { status: 500 }
     );
   }
@@ -90,7 +83,7 @@ export async function POST(req: NextRequest) {
     }
   ],` : "";
 
-  const prompt = `Eres un experto en análisis de contenido de fitness en español para redes sociales.
+  const userPrompt = `Eres un experto en análisis de contenido de fitness en español para redes sociales.
 
 ${GABIFIT_CONTEXT}
 
@@ -142,66 +135,30 @@ Genera ÚNICAMENTE un JSON válido (sin texto adicional, sin markdown, sin códi
 
 IMPORTANTE: El campo "type" del hook debe ser uno de: curiosidad, dolor, promesa, identidad, humor, sorpresa`;
 
-  // Try each model in order until one succeeds
-  let anthropicRes: Response | null = null;
-  let usedModel = "";
-  for (const model of MODELS) {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: maxTokens,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
+  const res = await fetch(KIE_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${KIE_KEY}`,
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [{ role: "user", content: userPrompt }],
+      max_tokens: maxTokens,
+    }),
+  });
 
-    if (res.ok) {
-      anthropicRes = res;
-      usedModel = model;
-      break;
-    }
-
-    if (res.status === 404) {
-      const errBody = await res.text().catch(() => "");
-      console.warn(`[analyze] model ${model} not available (404):`, errBody);
-      continue;
-    }
-
+  if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    let friendlyError = `Error de IA: ${res.status}`;
-    try {
-      const errJson = JSON.parse(errText);
-      if (errJson.error?.message?.includes("credit balance")) {
-        friendlyError = "Saldo insuficiente en Anthropic. Por favor revisa tu cuenta de facturación.";
-      } else if (errJson.error?.message) {
-        friendlyError = `Error IA: ${errJson.error.message}`;
-      }
-    } catch {
-      // Not JSON, use generic
-    }
-
-    console.error(`[analyze] Anthropic error ${res.status} with model ${model}:`, errText);
+    console.error(`[analyze] kie.ai error ${res.status}:`, errText);
     return NextResponse.json(
-      { error: friendlyError },
+      { error: `Error de IA: ${res.status}` },
       { status: 502 }
     );
   }
 
-  if (!anthropicRes) {
-    return NextResponse.json(
-      { error: "Ningún modelo de IA disponible. Verifica tu API key de Anthropic." },
-      { status: 502 }
-    );
-  }
-
-  console.log(`[analyze] Success with model: ${usedModel}, fullScript: ${wantsFullScript}`);
-  const anthropicData = await anthropicRes.json();
-  const rawText: string = anthropicData?.content?.[0]?.text ?? "{}";
+  const data = await res.json();
+  const rawText: string = data?.choices?.[0]?.message?.content ?? "{}";
 
   let analysis;
   try {
@@ -217,6 +174,7 @@ IMPORTANTE: El campo "type" del hook debe ser uno de: curiosidad, dolor, promesa
     );
   }
 
+  console.log(`[analyze] Success — model: ${MODEL}, fullScript: ${wantsFullScript}`);
   return NextResponse.json({
     ...analysis,
     postUrl,

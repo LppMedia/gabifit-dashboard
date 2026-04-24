@@ -1,8 +1,11 @@
+"use client";
+
 import {
   LayoutDashboard,
   Instagram,
   BarChart2,
   CalendarDays,
+  CalendarCheck,
   Swords,
   Newspaper,
   TrendingUp,
@@ -11,11 +14,14 @@ import {
   Clock,
   ArrowRight,
   Zap,
+  Bot,
+  Target,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-// ─── Section nav cards ────────────────────────────────────────────────────────
+// ─── Módulos del dashboard ─────────────────────────────────────────────────────
 const SECTIONS = [
   {
     label: "Instagram",
@@ -24,11 +30,11 @@ const SECTIONS = [
     color: "text-pink-400",
     bg: "bg-pink-500/10",
     border: "border-pink-500/20",
-    hover: "hover:border-pink-500/45 hover:shadow-pink-500/8",
+    hover: "hover:border-pink-500/45 hover:shadow-pink-500/10",
     bar: "from-pink-500 to-rose-400",
-    description: "Manage posts, stories & reels",
-    stat: "10 posts ready",
-    statColor: "text-pink-400",
+    description: "Gestiona posts, stories y reels",
+    badge: "Activo",
+    badgeColor: "bg-emerald-500/15 text-emerald-400 border-emerald-500/25",
   },
   {
     label: "Analytics",
@@ -37,113 +43,157 @@ const SECTIONS = [
     color: "text-cyan-400",
     bg: "bg-cyan-500/10",
     border: "border-cyan-500/20",
-    hover: "hover:border-cyan-500/45 hover:shadow-cyan-500/8",
+    hover: "hover:border-cyan-500/45 hover:shadow-cyan-500/10",
     bar: "from-cyan-500 to-blue-400",
-    description: "Track growth & engagement",
-    stat: "Coming soon",
-    statColor: "text-muted-foreground/50",
+    description: "Crecimiento, alcance y engagement real",
+    badge: "Activo",
+    badgeColor: "bg-emerald-500/15 text-emerald-400 border-emerald-500/25",
   },
   {
-    label: "Content Calendar",
+    label: "Calendario",
     href: "/calendar",
     icon: CalendarDays,
     color: "text-emerald-400",
     bg: "bg-emerald-500/10",
     border: "border-emerald-500/20",
-    hover: "hover:border-emerald-500/45 hover:shadow-emerald-500/8",
+    hover: "hover:border-emerald-500/45 hover:shadow-emerald-500/10",
     bar: "from-emerald-500 to-teal-400",
-    description: "Plan & schedule content",
-    stat: "Coming soon",
-    statColor: "text-muted-foreground/50",
+    description: "Planifica y agenda tu contenido",
+    badge: "Activo",
+    badgeColor: "bg-emerald-500/15 text-emerald-400 border-emerald-500/25",
   },
   {
-    label: "Competitors",
+    label: "Competidores",
     href: "/competitors",
     icon: Swords,
     color: "text-amber-400",
     bg: "bg-amber-500/10",
     border: "border-amber-500/20",
-    hover: "hover:border-amber-500/45 hover:shadow-amber-500/8",
+    hover: "hover:border-amber-500/45 hover:shadow-amber-500/10",
     bar: "from-amber-500 to-orange-400",
-    description: "Monitor competitor activity",
-    stat: "Coming soon",
-    statColor: "text-muted-foreground/50",
+    description: "Monitorea creadores y marcas con IA",
+    badge: "IA activa",
+    badgeColor: "bg-violet-500/15 text-violet-400 border-violet-500/25",
   },
   {
-    label: "News",
+    label: "Revisión Semanal",
+    href: "/revision",
+    icon: CalendarCheck,
+    color: "text-lime-400",
+    bg: "bg-lime-500/10",
+    border: "border-lime-500/20",
+    hover: "hover:border-lime-500/45 hover:shadow-lime-500/10",
+    bar: "from-lime-500 to-emerald-400",
+    description: "Analiza tu semana con IA y planifica la siguiente",
+    badge: "IA activa",
+    badgeColor: "bg-lime-500/15 text-lime-400 border-lime-500/25",
+  },
+  {
+    label: "Noticias",
     href: "/news",
     icon: Newspaper,
     color: "text-sky-400",
     bg: "bg-sky-500/10",
     border: "border-sky-500/20",
-    hover: "hover:border-sky-500/45 hover:shadow-sky-500/8",
+    hover: "hover:border-sky-500/45 hover:shadow-sky-500/10",
     bar: "from-sky-500 to-indigo-400",
-    description: "Stay on top of industry news",
-    stat: "Coming soon",
-    statColor: "text-muted-foreground/50",
+    description: "Noticias del sector con resúmenes IA",
+    badge: "Activo",
+    badgeColor: "bg-emerald-500/15 text-emerald-400 border-emerald-500/25",
   },
 ] as const;
 
-// ─── KPI stat cards ───────────────────────────────────────────────────────────
+// ─── KPIs ──────────────────────────────────────────────────────────────────────
 const KPI = [
   {
-    label: "Total Posts",
+    label: "Posts Totales",
     value: "10",
     icon: FileText,
-    color: "text-violet-400",
-    bg: "bg-violet-500/10",
-    delta: "+10 this week",
+    color: "text-pink-400",
+    bg: "bg-pink-500/10",
+    delta: "+10 esta semana",
   },
   {
-    label: "Scheduled",
+    label: "Programados",
     value: "3",
     icon: Clock,
     color: "text-emerald-400",
     bg: "bg-emerald-500/10",
-    delta: "Next: Mar 19",
+    delta: "Próximos listos",
   },
   {
-    label: "Published",
+    label: "Publicados",
     value: "2",
     icon: CheckCircle2,
     color: "text-blue-400",
     bg: "bg-blue-500/10",
-    delta: "Last: Mar 10",
+    delta: "Último: Mar 10",
   },
   {
-    label: "Drafts",
+    label: "Borradores",
     value: "5",
     icon: TrendingUp,
     color: "text-amber-400",
     bg: "bg-amber-500/10",
-    delta: "Ready to edit",
+    delta: "Listos para editar",
   },
 ];
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Accesos rápidos IA ────────────────────────────────────────────────────────
+const AI_TOOLS = [
+  {
+    label: "Revisión Semanal",
+    desc: "Plan semanal con IA — cada lunes",
+    href: "/revision",
+    icon: CalendarCheck,
+    color: "text-lime-400",
+    bg: "bg-lime-500/10",
+    border: "border-lime-500/20",
+  },
+  {
+    label: "Ver Analytics",
+    desc: "Datos de Instagram en tiempo real",
+    href: "/analytics",
+    icon: BarChart2,
+    color: "text-cyan-400",
+    bg: "bg-cyan-500/10",
+    border: "border-cyan-500/20",
+  },
+  {
+    label: "Crear Contenido",
+    desc: "Nuevo post para Instagram",
+    href: "/instagram",
+    icon: Instagram,
+    color: "text-pink-400",
+    bg: "bg-pink-500/10",
+    border: "border-pink-500/20",
+  },
+];
+
+// ─── Página ────────────────────────────────────────────────────────────────────
 export default function OverviewPage() {
   const hour = new Date().getHours();
   const greeting =
-    hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+    hour < 12 ? "Buenos días" : hour < 18 ? "Buenas tardes" : "Buenas noches";
 
   return (
     <div className="flex flex-col gap-8">
 
       {/* ── Hero banner ───────────────────────────────────────────────── */}
-      <div className="relative overflow-hidden rounded-2xl border border-border/40 bg-card px-7 py-8">
-        {/* Mesh gradients */}
+      <div className="relative overflow-hidden rounded-2xl border border-lime-500/15 bg-card px-7 py-8">
+        {/* Ambient glows */}
         <div className="pointer-events-none absolute inset-0 select-none">
-          <div className="absolute -left-16 -top-16 h-60 w-60 rounded-full bg-violet-600/8 blur-3xl" />
-          <div className="absolute -bottom-10 right-10 h-44 w-44 rounded-full bg-pink-600/8 blur-3xl" />
-          <div className="absolute bottom-0 left-1/2 h-px w-3/4 -translate-x-1/2 bg-gradient-to-r from-transparent via-violet-500/15 to-transparent" />
+          <div className="absolute -left-20 -top-20 h-72 w-72 rounded-full bg-lime-600/8 blur-3xl" />
+          <div className="absolute -bottom-10 right-8 h-52 w-52 rounded-full bg-emerald-600/8 blur-3xl" />
+          <div className="absolute bottom-0 left-1/2 h-px w-3/4 -translate-x-1/2 bg-gradient-to-r from-transparent via-lime-500/20 to-transparent" />
         </div>
 
         <div className="relative flex items-start justify-between gap-4">
           <div>
-            {/* Pill badge */}
-            <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-violet-500/25 bg-violet-500/10 px-3 py-1">
-              <Zap className="h-3 w-3 text-violet-400" />
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-violet-400">
+            {/* Pill */}
+            <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-lime-500/30 bg-lime-500/10 px-3 py-1">
+              <Zap className="h-3 w-3 text-lime-400" />
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-lime-400">
                 GabiFit Studio
               </span>
             </div>
@@ -152,9 +202,9 @@ export default function OverviewPage() {
               {greeting}, Gabi
             </h2>
             <p className="mt-2 text-[13px] text-muted-foreground">
-              Your content dashboard is ready.{" "}
+              Tu dashboard de contenido está listo.{" "}
               <span className="text-foreground/60">
-                {new Date().toLocaleDateString("en-US", {
+                {new Date().toLocaleDateString("es-CO", {
                   weekday: "long",
                   month: "long",
                   day: "numeric",
@@ -163,26 +213,26 @@ export default function OverviewPage() {
             </p>
           </div>
 
-          <div className="hidden h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-pink-500 shadow-xl shadow-violet-500/20 sm:flex">
-            <LayoutDashboard className="h-7 w-7 text-white" />
+          <div className="hidden h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-lime-400 to-emerald-500 shadow-xl shadow-lime-500/25 sm:flex">
+            <LayoutDashboard className="h-7 w-7 text-black" />
           </div>
         </div>
 
         {/* CTAs */}
         <div className="relative mt-6 flex flex-wrap gap-3">
           <Link
-            href="/instagram"
-            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-pink-600 to-violet-600 px-5 py-2.5 text-[13px] font-semibold text-white shadow-lg shadow-pink-500/20 transition-all duration-200 hover:opacity-90 hover:shadow-pink-500/30"
+            href="/revision"
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-lime-500 to-emerald-500 px-5 py-2.5 text-[13px] font-semibold text-black shadow-lg shadow-lime-500/25 transition-all hover:opacity-90 hover:shadow-lime-500/35"
           >
-            <Instagram className="h-4 w-4" />
-            Create Post
+            <CalendarCheck className="h-4 w-4" />
+            Revisión Semanal
           </Link>
           <Link
-            href="/analytics"
-            className="inline-flex items-center gap-2 rounded-xl border border-border/40 bg-white/[0.04] px-5 py-2.5 text-[13px] font-medium text-muted-foreground transition-all duration-200 hover:border-border/70 hover:bg-white/[0.07] hover:text-foreground"
+            href="/competitors"
+            className="inline-flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-5 py-2.5 text-[13px] font-medium text-amber-300 transition-all hover:border-amber-500/55 hover:bg-amber-500/20 hover:text-amber-200"
           >
-            <BarChart2 className="h-4 w-4" />
-            View Analytics
+            <Bot className="h-4 w-4" />
+            Analizar Competidores
           </Link>
         </div>
       </div>
@@ -190,7 +240,7 @@ export default function OverviewPage() {
       {/* ── KPI stats ─────────────────────────────────────────────────── */}
       <div>
         <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/40">
-          At a Glance
+          Resumen
         </p>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {KPI.map(({ label, value, icon: Icon, color, bg, delta }) => (
@@ -211,14 +261,43 @@ export default function OverviewPage() {
         </div>
       </div>
 
-      {/* ── Sections grid ─────────────────────────────────────────────── */}
+      {/* ── Accesos IA ────────────────────────────────────────────────── */}
+      <div>
+        <p className="mb-3 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/40">
+          <Sparkles className="h-3 w-3" />
+          Accesos Rápidos IA
+        </p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {AI_TOOLS.map(({ label, desc, href, icon: Icon, color, bg, border }) => (
+            <Link key={href} href={href} className="group">
+              <div
+                className={cn(
+                  "flex items-center gap-3 rounded-xl border bg-card px-4 py-3.5 transition-all duration-200 hover:bg-accent/20",
+                  border
+                )}
+              >
+                <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", bg)}>
+                  <Icon className={cn("h-4 w-4", color)} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-semibold text-foreground">{label}</p>
+                  <p className="text-[11px] text-muted-foreground/55">{desc}</p>
+                </div>
+                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/25 transition-all group-hover:translate-x-0.5 group-hover:text-muted-foreground/60" />
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Módulos ───────────────────────────────────────────────────── */}
       <div>
         <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/40">
-          Sections
+          Módulos
         </p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {SECTIONS.map(
-            ({ label, href, icon: Icon, color, bg, border, hover, bar, description, stat, statColor }) => (
+            ({ label, href, icon: Icon, color, bg, border, hover, bar, description, badge, badgeColor }) => (
               <Link key={href} href={href} className="group block">
                 <div
                   className={cn(
@@ -227,7 +306,7 @@ export default function OverviewPage() {
                     hover
                   )}
                 >
-                  {/* Gradient accent stripe */}
+                  {/* Color stripe */}
                   <div className={cn("h-[3px] w-full bg-gradient-to-r", bar)} />
 
                   <div className="px-5 py-4">
@@ -235,7 +314,7 @@ export default function OverviewPage() {
                       <div className={cn("flex h-9 w-9 items-center justify-center rounded-xl", bg)}>
                         <Icon className={cn("h-4 w-4", color)} />
                       </div>
-                      <ArrowRight className="h-4 w-4 translate-x-0 text-muted-foreground/25 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-muted-foreground/60" />
+                      <ArrowRight className="h-4 w-4 text-muted-foreground/25 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-muted-foreground/60" />
                     </div>
 
                     <p className="font-display mt-3 text-[15px] font-semibold tracking-tight text-foreground">
@@ -246,8 +325,13 @@ export default function OverviewPage() {
                     </p>
 
                     <div className="mt-4 border-t border-border/25 pt-3">
-                      <span className={cn("text-[11px] font-semibold", statColor)}>
-                        {stat}
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold tracking-wide",
+                          badgeColor
+                        )}
+                      >
+                        {badge}
                       </span>
                     </div>
                   </div>
