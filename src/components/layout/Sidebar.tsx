@@ -4,9 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Instagram,
-  BarChart2,
   CalendarDays,
-  CalendarCheck,
   Swords,
   Newspaper,
   LayoutDashboard,
@@ -28,20 +26,12 @@ const NAV_ITEMS = [
     bg: "bg-pink-500/10",
   },
   {
-    label: "Instagram",
+    label: "Instagram Studio",
     href: "/instagram",
     icon: Instagram,
     color: "text-pink-400",
     bar: "bg-pink-400",
     bg: "bg-pink-500/10",
-  },
-  {
-    label: "Analytics",
-    href: "/analytics",
-    icon: BarChart2,
-    color: "text-cyan-400",
-    bar: "bg-cyan-400",
-    bg: "bg-cyan-500/10",
   },
   {
     label: "Calendario",
@@ -50,14 +40,6 @@ const NAV_ITEMS = [
     color: "text-emerald-400",
     bar: "bg-emerald-400",
     bg: "bg-emerald-500/10",
-  },
-  {
-    label: "Revisión Semanal",
-    href: "/revision",
-    icon: CalendarCheck,
-    color: "text-lime-400",
-    bar: "bg-lime-400",
-    bg: "bg-lime-500/10",
   },
   {
     label: "Competidores",

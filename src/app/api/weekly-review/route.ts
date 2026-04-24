@@ -138,6 +138,20 @@ Genera ÚNICAMENTE JSON válido (sin markdown, sin texto adicional):
     );
   }
 
+  // Always compute real totals from the actual posts array — never trust the AI to sum correctly
+  const realLikes    = posts.reduce((s: number, p: RawPost) => s + (p.likesCount    || 0), 0);
+  const realComments = posts.reduce((s: number, p: RawPost) => s + (p.commentsCount || 0), 0);
+  const realViews    = posts.reduce((s: number, p: RawPost) => s + (p.videoViewCount || 0), 0);
+  const realAvgEng   = realViews > 0
+    ? `${((realLikes + realComments) / realViews * 100).toFixed(2)}%`
+    : realLikes > 0 ? `${(realLikes / posts.length).toFixed(0)} avg likes` : "0%";
+  if (!analysis.weekSummary) analysis.weekSummary = {};
+  analysis.weekSummary.totalPosts    = posts.length;
+  analysis.weekSummary.totalLikes    = realLikes;
+  analysis.weekSummary.totalComments = realComments;
+  analysis.weekSummary.totalViews    = realViews;
+  analysis.weekSummary.avgEngagement = analysis.weekSummary.avgEngagement || realAvgEng;
+
   return NextResponse.json({
     ...analysis,
     generatedAt:   new Date().toISOString(),

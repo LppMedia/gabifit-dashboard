@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 // ─── Módulos del dashboard ─────────────────────────────────────────────────────
 const SECTIONS = [
   {
-    label: "Instagram",
+    label: "Instagram Studio",
     href: "/instagram",
     icon: Instagram,
     color: "text-pink-400",
@@ -32,22 +32,9 @@ const SECTIONS = [
     border: "border-pink-500/20",
     hover: "hover:border-pink-500/45 hover:shadow-pink-500/10",
     bar: "from-pink-500 to-rose-400",
-    description: "Gestiona posts, stories y reels",
-    badge: "Activo",
-    badgeColor: "bg-emerald-500/15 text-emerald-400 border-emerald-500/25",
-  },
-  {
-    label: "Analytics",
-    href: "/analytics",
-    icon: BarChart2,
-    color: "text-cyan-400",
-    bg: "bg-cyan-500/10",
-    border: "border-cyan-500/20",
-    hover: "hover:border-cyan-500/45 hover:shadow-cyan-500/10",
-    bar: "from-cyan-500 to-blue-400",
-    description: "Crecimiento, alcance y engagement real",
-    badge: "Activo",
-    badgeColor: "bg-emerald-500/15 text-emerald-400 border-emerald-500/25",
+    description: "Feed, analytics, plan semanal IA y gestión de posts",
+    badge: "IA activa",
+    badgeColor: "bg-violet-500/15 text-violet-400 border-violet-500/25",
   },
   {
     label: "Calendario",
@@ -74,19 +61,6 @@ const SECTIONS = [
     description: "Monitorea creadores y marcas con IA",
     badge: "IA activa",
     badgeColor: "bg-violet-500/15 text-violet-400 border-violet-500/25",
-  },
-  {
-    label: "Revisión Semanal",
-    href: "/revision",
-    icon: CalendarCheck,
-    color: "text-lime-400",
-    bg: "bg-lime-500/10",
-    border: "border-lime-500/20",
-    hover: "hover:border-lime-500/45 hover:shadow-lime-500/10",
-    bar: "from-lime-500 to-emerald-400",
-    description: "Analiza tu semana con IA y planifica la siguiente",
-    badge: "IA activa",
-    badgeColor: "bg-lime-500/15 text-lime-400 border-lime-500/25",
   },
   {
     label: "Noticias",
@@ -142,31 +116,31 @@ const KPI = [
 // ─── Accesos rápidos IA ────────────────────────────────────────────────────────
 const AI_TOOLS = [
   {
-    label: "Revisión Semanal",
-    desc: "Plan semanal con IA — cada lunes",
-    href: "/revision",
-    icon: CalendarCheck,
-    color: "text-lime-400",
-    bg: "bg-lime-500/10",
-    border: "border-lime-500/20",
-  },
-  {
-    label: "Ver Analytics",
-    desc: "Datos de Instagram en tiempo real",
-    href: "/analytics",
-    icon: BarChart2,
-    color: "text-cyan-400",
-    bg: "bg-cyan-500/10",
-    border: "border-cyan-500/20",
-  },
-  {
-    label: "Crear Contenido",
-    desc: "Nuevo post para Instagram",
+    label: "Instagram Studio",
+    desc: "Feed, analytics y plan semanal IA",
     href: "/instagram",
     icon: Instagram,
     color: "text-pink-400",
     bg: "bg-pink-500/10",
     border: "border-pink-500/20",
+  },
+  {
+    label: "Competidores",
+    desc: "Monitorea creadores y marcas con IA",
+    href: "/competitors",
+    icon: Swords,
+    color: "text-amber-400",
+    bg: "bg-amber-500/10",
+    border: "border-amber-500/20",
+  },
+  {
+    label: "Calendario",
+    desc: "Planifica y agenda tu contenido",
+    href: "/calendar",
+    icon: CalendarDays,
+    color: "text-emerald-400",
+    bg: "bg-emerald-500/10",
+    border: "border-emerald-500/20",
   },
 ];
 
@@ -221,11 +195,11 @@ export default function OverviewPage() {
         {/* CTAs */}
         <div className="relative mt-6 flex flex-wrap gap-3">
           <Link
-            href="/revision"
+            href="/instagram"
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-lime-500 to-emerald-500 px-5 py-2.5 text-[13px] font-semibold text-black shadow-lg shadow-lime-500/25 transition-all hover:opacity-90 hover:shadow-lime-500/35"
           >
-            <CalendarCheck className="h-4 w-4" />
-            Revisión Semanal
+            <Instagram className="h-4 w-4" />
+            Instagram Studio
           </Link>
           <Link
             href="/competitors"
