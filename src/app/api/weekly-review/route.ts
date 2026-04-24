@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const KIE_KEY = process.env.KIE_AI_API_KEY ?? "";
 const KIE_URL = "https://kieai.erweima.ai/api/v1/chat/completions";
-const MODEL   = "deepseek-chat";
+const MODEL   = "claude-opus-4-5";
 
 export async function POST(req: NextRequest) {
   if (!KIE_KEY) {
