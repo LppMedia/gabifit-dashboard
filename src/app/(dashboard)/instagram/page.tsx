@@ -6,7 +6,7 @@ import {
   CheckCircle2, Archive, Search, TrendingUp, TrendingDown, Minus,
   Loader2, RefreshCw, Play, X, Eye, Heart, MessageCircle, Zap,
   Target, Sparkles, Video, LayoutGrid, BookOpen, Star, Lightbulb,
-  Users, ExternalLink, Plus,
+  Users, ExternalLink, Plus, Rocket, FlameKindling, Brain, AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +41,9 @@ interface PostAnalysis {
 interface ContentPiece {
   day: string; format: string; topic: string; hook: string; cta: string; notes: string;
 }
+interface ContentPillar {
+  pillar: string; why: string; frequency: string; exampleHook: string;
+}
 interface WeeklyAnalysis {
   weekSummary: {
     totalPosts: number; totalLikes: number; totalComments: number;
@@ -51,9 +54,21 @@ interface WeeklyAnalysis {
   voiceAnalysis: { strengths: string[]; opportunities: string[]; toneScore: number; consistencyScore: number; };
   topicsThisWeek: string[];
   audienceAlignment: { score: number; notes: string; emotionalHooks: string[]; };
+  trendInsights: {
+    topFormatsNow: string[];
+    viralHooksToTest: string[];
+    contentGaps: string[];
+    algorithmTips: string[];
+  };
+  growthStrategy: {
+    mainBottleneck: string;
+    quickWins: string[];
+    contentPillars: ContentPillar[];
+  };
   competitorInsights: string;
   nextWeekPlan: { theme: string; contentPieces: ContentPiece[]; hashtags: string[]; keyMessage: string; };
   actionItems: string[];
+  generatedAt?: string;
 }
 interface MonthlyEntry {
   week: string; totalPosts: number; totalLikes: number; totalViews: number; avgEngagement: string;
@@ -388,16 +403,45 @@ function ChartCard({ title, accentClass, children }: { title: string; accentClas
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function InstagramPage() {
-  const [activeTab, setActiveTab]       = useState("feed");
-  const [pendingHandle, setPendingHandle] = useState("");
-  const [planStep, setPlanStep]         = useState<PlanStep>("idle");
+  const [activeTab, setActiveTab]           = useState("feed");
+  const [pendingHandle, setPendingHandle]   = useState("");
+  const [planStep, setPlanStep]             = useState<PlanStep>("idle");
   const [weeklyAnalysis, setWeeklyAnalysis] = useState<WeeklyAnalysis | null>(null);
-  const [planError, setPlanError]       = useState<string | null>(null);
-  const [paMap, setPaMap]               = useState<Record<string, PostAnalysis>>({});
-  const [logRefreshKey, setLogRefreshKey] = useState(0);
-  const [search, setSearch]             = useState("");
-  const [dialogOpen, setDialogOpen]     = useState(false);
-  const [editPost, setEditPost]         = useState<InstagramPost | null>(null);
+  const [planError, setPlanError]           = useState<string | null>(null);
+  const [paMap, setPaMap]                   = useState<Record<string, PostAnalysis>>({});
+  const [logRefreshKey, setLogRefreshKey]   = useState(0);
+  const [planLoadedAt, setPlanLoadedAt]     = useState<string | null>(null);
+  const [search, setSearch]                 = useState("");
+  const [dialogOpen, setDialogOpen]         = useState(false);
+  const [editPost, setEditPost]             = useState<InstagramPost | null>(null);
+
+  // Load latest saved plan from Supabase on mount so it persists after refresh
+  useEffect(() => {
+    async function loadSavedPlan() {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data } = await supabase
+          .from("weekly_reviews")
+          .select("analysis, scraped_at")
+          .eq("user_id", user.id)
+          .order("week_start_date", { ascending: false })
+          .limit(1)
+          .single();
+        if (data?.analysis?.postAnalyses?.length) {
+          const savedAnalysis = data.analysis as WeeklyAnalysis;
+          setWeeklyAnalysis(savedAnalysis);
+          const map: Record<string, PostAnalysis> = {};
+          (savedAnalysis.postAnalyses ?? []).forEach((pa) => { map[pa.shortCode] = pa; });
+          setPaMap(map);
+          setPlanStep("done");
+          setPlanLoadedAt(data.scraped_at ?? null);
+        }
+      } catch { /* non-critical */ }
+    }
+    loadSavedPlan();
+  }, []);
 
   const { profile, loading: profileLoading, error: profileError, scrapeProfile, clearProfile } = useIgProfile();
   const analytics = useMemo(() => profile ? computeAnalytics(profile.posts) : null, [profile]);
@@ -873,11 +917,126 @@ export default function InstagramPage() {
                     </div>
                   )}
 
-                  <div className="flex justify-end">
-                    <Button variant="outline" onClick={() => { setPlanStep("idle"); setWeeklyAnalysis(null); setPaMap({}); }}
-                      className="gap-2 text-[12px]">
-                      <RefreshCw className="h-3.5 w-3.5" />Nueva Revisión
-                    </Button>
+                  {/* Tendencias 2025 */}
+                  {wa.trendInsights && (
+                    <div className="rounded-xl border border-border/40 bg-card overflow-hidden">
+                      <div className="h-[3px] bg-gradient-to-r from-violet-500 to-pink-500" />
+                      <div className="p-5 flex flex-col gap-4">
+                        <h3 className="font-display text-[15px] font-semibold flex items-center gap-2">
+                          <FlameKindling className="h-4 w-4 text-violet-400" />Tendencias 2025 — Tu Nicho
+                        </h3>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          {(wa.trendInsights.topFormatsNow ?? []).length > 0 && (
+                            <div className="flex flex-col gap-2">
+                              <p className="text-[10px] uppercase tracking-wide font-semibold text-violet-400/70">Formatos que están explotando ahora</p>
+                              {wa.trendInsights.topFormatsNow.map((f, i) => (
+                                <div key={i} className="flex items-start gap-2 text-[12px] text-foreground/80">
+                                  <FlameKindling className="h-3 w-3 mt-0.5 shrink-0 text-violet-400" />{f}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {(wa.trendInsights.viralHooksToTest ?? []).length > 0 && (
+                            <div className="flex flex-col gap-2">
+                              <p className="text-[10px] uppercase tracking-wide font-semibold text-pink-400/70">Hooks virales listos para grabar</p>
+                              {wa.trendInsights.viralHooksToTest.map((h, i) => (
+                                <div key={i} className="flex items-start gap-2 text-[12px] text-foreground/80">
+                                  <Zap className="h-3 w-3 mt-0.5 shrink-0 text-pink-400" />
+                                  <span className="italic text-pink-200/80">"{h}"</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {(wa.trendInsights.contentGaps ?? []).length > 0 && (
+                            <div className="flex flex-col gap-2">
+                              <p className="text-[10px] uppercase tracking-wide font-semibold text-amber-400/70">Gaps vs competencia</p>
+                              {wa.trendInsights.contentGaps.map((g, i) => (
+                                <div key={i} className="flex items-start gap-2 text-[12px] text-foreground/80">
+                                  <AlertCircle className="h-3 w-3 mt-0.5 shrink-0 text-amber-400" />{g}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {(wa.trendInsights.algorithmTips ?? []).length > 0 && (
+                            <div className="flex flex-col gap-2">
+                              <p className="text-[10px] uppercase tracking-wide font-semibold text-cyan-400/70">Tips de algoritmo</p>
+                              {wa.trendInsights.algorithmTips.map((t, i) => (
+                                <div key={i} className="flex items-start gap-2 text-[12px] text-foreground/80">
+                                  <Brain className="h-3 w-3 mt-0.5 shrink-0 text-cyan-400" />{t}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Estrategia de Crecimiento */}
+                  {wa.growthStrategy && (
+                    <div className="rounded-xl border border-border/40 bg-card overflow-hidden">
+                      <div className="h-[3px] bg-gradient-to-r from-emerald-500 to-cyan-400" />
+                      <div className="p-5 flex flex-col gap-4">
+                        <h3 className="font-display text-[15px] font-semibold flex items-center gap-2">
+                          <Rocket className="h-4 w-4 text-emerald-400" />Estrategia de Crecimiento
+                        </h3>
+                        {wa.growthStrategy.mainBottleneck && (
+                          <div className="rounded-xl border border-amber-500/30 bg-amber-500/8 px-4 py-3 flex items-start gap-2.5">
+                            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-400" />
+                            <div>
+                              <p className="text-[10px] uppercase tracking-wide font-semibold text-amber-400/70 mb-0.5">Freno #1 al crecimiento</p>
+                              <p className="text-[13px] text-foreground/90">{wa.growthStrategy.mainBottleneck}</p>
+                            </div>
+                          </div>
+                        )}
+                        {(wa.growthStrategy.quickWins ?? []).length > 0 && (
+                          <div className="flex flex-col gap-2">
+                            <p className="text-[10px] uppercase tracking-wide font-semibold text-emerald-400/70">Quick wins esta semana</p>
+                            {wa.growthStrategy.quickWins.map((w, i) => (
+                              <div key={i} className="flex items-start gap-2 text-[13px] text-foreground/80">
+                                <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-emerald-500/40 bg-emerald-500/10 text-[10px] font-bold text-emerald-400">
+                                  {i + 1}
+                                </div>
+                                {w}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {(wa.growthStrategy.contentPillars ?? []).length > 0 && (
+                          <div className="flex flex-col gap-3">
+                            <p className="text-[10px] uppercase tracking-wide font-semibold text-cyan-400/70">Pilares de contenido</p>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              {wa.growthStrategy.contentPillars.map((cp, i) => (
+                                <div key={i} className="rounded-xl border border-border/30 bg-white/[0.02] p-3 flex flex-col gap-1.5">
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-[13px] font-semibold text-foreground">{cp.pillar}</p>
+                                    <span className="text-[10px] text-cyan-400 font-medium">{cp.frequency}</span>
+                                  </div>
+                                  <p className="text-[11px] text-muted-foreground/60">{cp.why}</p>
+                                  {cp.exampleHook && (
+                                    <p className="text-[11px] italic text-lime-300/70">"{cp.exampleHook}"</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between">
+                    {planLoadedAt && (
+                      <p className="text-[10px] text-muted-foreground/40">
+                        Generado {new Date(planLoadedAt).toLocaleDateString("es-DO", { day: "numeric", month: "short", year: "numeric" })}
+                      </p>
+                    )}
+                    <div className="ml-auto">
+                      <Button variant="outline" onClick={() => { setPlanStep("idle"); setWeeklyAnalysis(null); setPaMap({}); }}
+                        className="gap-2 text-[12px]">
+                        <RefreshCw className="h-3.5 w-3.5" />Nueva Revisión
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
