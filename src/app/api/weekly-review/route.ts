@@ -9,8 +9,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "KIE_AI_API_KEY no configurado" }, { status: 500 });
   }
 
-  const { posts, transcripts, competitorSummary, handle, scope = "week", month } =
-    await req.json().catch(() => ({}));
+  const body = await req.json().catch(() => ({}));
+  const { posts, transcripts, competitorSummary, handle } = body;
+  const scope: "week" | "month" = body.scope === "month" ? "month" : "week";
+  const month: string | undefined = typeof body.month === "string" ? body.month : undefined;
+  void month;
 
   if (!posts?.length) {
     return NextResponse.json({ error: "No hay posts para analizar" }, { status: 400 });
@@ -64,9 +67,6 @@ export async function POST(req: NextRequest) {
   const nextMonday = new Date(today);
   nextMonday.setDate(today.getDate() + daysToMonday);
   const nextMondayStr = nextMonday.toISOString().slice(0, 10);
-
-  // Suppress unused variable warning — month param kept for future anchoring
-  void month;
 
   const scopeInstruction = scope === "month"
     ? `scope=month → genera 4 semanas completas (~24-28 posts total). Distribuye por semana: semana1=educativo, semana2=ventas_curso, semana3=comunidad, semana4=evento_presencial`
@@ -315,16 +315,18 @@ Genera ÚNICAMENTE JSON válido (sin markdown, sin explicaciones fuera del JSON)
   const recentLikes    = recentPosts.reduce((s: number, p: RawPost) => s + (p.likesCount    || 0), 0);
   const recentComments = recentPosts.reduce((s: number, p: RawPost) => s + (p.commentsCount || 0), 0);
   const recentViews    = recentPosts.reduce((s: number, p: RawPost) => s + (p.videoViewCount || 0), 0);
-  const recentAvgEng   = recentViews > 0
+  const recentAvgEng = recentViews > 0
     ? parseFloat(((recentLikes + recentComments) / recentViews * 100).toFixed(2))
-    : recentLikes > 0 ? parseFloat(((recentLikes + recentComments) / Math.max(recentPosts.length, 1)).toFixed(2)) : 0;
+    : 0;
 
   // Count best performing format in recent posts
   const formatCount: Record<string, number> = {};
   recentPosts.forEach((p: RawPost) => {
     formatCount[p.type] = (formatCount[p.type] ?? 0) + 1;
   });
-  const bestFormat = Object.entries(formatCount).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Reel";
+  const bestFormat = recentPosts.length > 0
+    ? (Object.entries(formatCount).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "")
+    : "";
 
   if (analysis.weeklyReport) {
     const wr = analysis.weeklyReport as Record<string, unknown>;
@@ -338,19 +340,22 @@ Genera ÚNICAMENTE JSON válido (sin markdown, sin explicaciones fuera del JSON)
     };
 
     // ── Enrich topPosts with thumbnailUrl + real metrics ──────────────────────
-    const postsMap = new Map<string, RawPost>(posts.map((p: RawPost) => [p.shortCode, p]));
-    const topPosts = wr.topPosts as Array<Record<string, unknown>> | undefined;
-    if (topPosts?.length) {
-      wr.topPosts = topPosts.map((tp) => {
-        const src = postsMap.get(tp.shortCode as string);
-        return {
-          ...tp,
-          thumbnailUrl:    src?.displayUrl    ?? "",
-          likesCount:      src?.likesCount    ?? 0,
-          commentsCount:   src?.commentsCount ?? 0,
-          videoViewCount:  src?.videoViewCount ?? 0,
-        };
-      });
+    const rawTopPosts = wr.topPosts;
+    if (Array.isArray(rawTopPosts) && rawTopPosts.length) {
+      const postsMap = new Map<string, RawPost>(posts.map((p: RawPost) => [p.shortCode, p]));
+      wr.topPosts = rawTopPosts
+        .filter((tp): tp is Record<string, unknown> => !!tp && typeof tp === "object")
+        .map((tp) => {
+          const code = typeof tp.shortCode === "string" ? tp.shortCode : "";
+          const src = postsMap.get(code);
+          return {
+            ...tp,
+            thumbnailUrl:   src?.displayUrl    ?? "",
+            likesCount:     src?.likesCount    ?? 0,
+            commentsCount:  src?.commentsCount ?? 0,
+            videoViewCount: src?.videoViewCount ?? 0,
+          };
+        });
     }
   }
 
