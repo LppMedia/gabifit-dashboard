@@ -448,9 +448,11 @@ export default function InstagramPage() {
           (savedAnalysis.postAnalyses ?? []).forEach((pa) => { map[pa.shortCode] = pa; });
           setPaMap(map);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          if ((savedAnalysis as any).weeklyReport) setWeeklyReport((savedAnalysis as any).weeklyReport);
+          const wr = (savedAnalysis as any).weeklyReport;
+          if (wr?.resumenSemana && Array.isArray(wr.topPosts)) setWeeklyReport(wr);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          if ((savedAnalysis as any).contentPlan)  setContentPlan((savedAnalysis as any).contentPlan);
+          const cp = (savedAnalysis as any).contentPlan;
+          if (cp?.scope && Array.isArray(cp.semanas)) setContentPlan(cp);
           setPlanStep("done");
           setPlanLoadedAt(data.scraped_at ?? null);
         }

@@ -54,21 +54,26 @@ export function CalendarFillModal({ open, onOpenChange, contentPlan }: Props) {
 
       const { data: existing } = await supabase
         .from("calendar_posts")
-        .select("date")
+        .select("date, platform")
         .gte("date", rangeStart)
         .lte("date", rangeEnd)
         .eq("user_id", user.id);
 
       if (cancelled) return;
 
-      const occupiedDates = new Set<string>((existing ?? []).map((r) => r.date as string));
+      const occupiedSlots = new Set<string>(
+        (existing ?? []).map((r) => `${r.date as string}:${r.platform as string}`)
+      );
 
       setRows(
-        allPlanPosts.map((post) => ({
-          ...post,
-          conflict: occupiedDates.has(post.fecha),
-          selected: !occupiedDates.has(post.fecha),
-        }))
+        allPlanPosts.map((post) => {
+          const slot = `${post.fecha}:${post.plataforma}`;
+          return {
+            ...post,
+            conflict: occupiedSlots.has(slot),
+            selected: !occupiedSlots.has(slot),
+          };
+        })
       );
       setLoading(false);
     }
@@ -224,7 +229,10 @@ export function CalendarFillModal({ open, onOpenChange, contentPlan }: Props) {
         {/* Footer */}
         <div className="flex items-center justify-between gap-4 px-6 py-4 border-t border-border/30 bg-background shrink-0">
           {toast ? (
-            <p className="text-[13px] text-emerald-400 font-medium">{toast}</p>
+            <p className={cn(
+              "text-[13px] font-medium",
+              toast.startsWith("Error") ? "text-red-400" : "text-emerald-400"
+            )}>{toast}</p>
           ) : (
             <p className="text-[12px] text-muted-foreground/50">
               {selectedCount} de {rows.length} posts serán creados en el calendario
