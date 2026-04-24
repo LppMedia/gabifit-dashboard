@@ -6,11 +6,11 @@ import {
   Instagram,
   BarChart2,
   CalendarDays,
+  CalendarCheck,
   Swords,
   Newspaper,
   LayoutDashboard,
   ChevronRight,
-  Zap,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,12 +20,12 @@ import { useSession } from "@/components/providers/SessionProvider";
 // ─── Nav items ────────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
   {
-    label: "Overview",
+    label: "Inicio",
     href: "/",
     icon: LayoutDashboard,
-    color: "text-violet-400",
-    bar: "bg-violet-400",
-    bg: "bg-violet-500/10",
+    color: "text-pink-400",
+    bar: "bg-pink-400",
+    bg: "bg-pink-500/10",
   },
   {
     label: "Instagram",
@@ -44,7 +44,7 @@ const NAV_ITEMS = [
     bg: "bg-cyan-500/10",
   },
   {
-    label: "Content Calendar",
+    label: "Calendario",
     href: "/calendar",
     icon: CalendarDays,
     color: "text-emerald-400",
@@ -52,7 +52,15 @@ const NAV_ITEMS = [
     bg: "bg-emerald-500/10",
   },
   {
-    label: "Competitors",
+    label: "Revisión Semanal",
+    href: "/revision",
+    icon: CalendarCheck,
+    color: "text-lime-400",
+    bar: "bg-lime-400",
+    bg: "bg-lime-500/10",
+  },
+  {
+    label: "Competidores",
     href: "/competitors",
     icon: Swords,
     color: "text-amber-400",
@@ -60,7 +68,7 @@ const NAV_ITEMS = [
     bg: "bg-amber-500/10",
   },
   {
-    label: "News",
+    label: "Noticias",
     href: "/news",
     icon: Newspaper,
     color: "text-sky-400",
@@ -83,21 +91,15 @@ export function Sidebar() {
     <aside className="relative flex h-screen w-60 flex-col overflow-hidden border-r border-border/50 bg-sidebar">
 
       {/* Ambient glow */}
-      <div className="pointer-events-none absolute -left-12 -top-12 h-48 w-48 rounded-full bg-violet-600/8 blur-3xl" />
+      <div className="pointer-events-none absolute -left-12 -top-12 h-48 w-48 rounded-full bg-lime-500/8 blur-3xl" />
 
       {/* ── Logo / Brand ──────────────────────────────────────────────── */}
-      <div className="relative flex h-16 items-center gap-3 px-5">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-pink-500 shadow-lg shadow-violet-500/25">
-          <Zap className="h-4 w-4 text-white" strokeWidth={2.5} />
-        </div>
-        <div className="flex flex-col leading-none">
-          <span className="font-display text-[15px] font-semibold tracking-tight text-foreground">
-            GabiFit
-          </span>
-          <span className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground/60">
-            Studio
-          </span>
-        </div>
+      <div className="relative flex h-16 items-center px-5">
+        <img
+          src="https://res.cloudinary.com/dmkx2uowd/image/upload/q_auto/f_auto/v1775404908/GABIFIT_LOGO_VARIANTES_GABIFIT_copy_3_1_kjjzmf.png"
+          alt="GabiFit"
+          style={{ width: "auto", height: "32px", objectFit: "contain" }}
+        />
       </div>
 
       <Separator className="opacity-40" />
@@ -105,7 +107,7 @@ export function Sidebar() {
       {/* ── Navigation ────────────────────────────────────────────────── */}
       <nav className="flex-1 overflow-y-auto px-3 py-5">
         <p className="mb-3 px-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/40">
-          Workspace
+          Workspace GabiFit
         </p>
         <ul className="space-y-0.5">
           {NAV_ITEMS.map(({ label, href, icon: Icon, color, bar, bg }) => {
@@ -168,7 +170,7 @@ export function Sidebar() {
       <div className="px-3 py-4">
         <div className="flex items-center gap-3 rounded-xl border border-border/30 bg-white/[0.03] px-3 py-2.5 backdrop-blur-sm">
           {/* Avatar with online indicator */}
-          <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 to-violet-500 text-[11px] font-bold text-white shadow-md shadow-pink-500/20">
+          <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-lime-400 to-emerald-500 text-[11px] font-bold text-white shadow-md shadow-lime-500/20">
             {initials}
             <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-[2px] border-sidebar bg-emerald-400" />
           </div>
@@ -189,7 +191,7 @@ export function Sidebar() {
           </button>
         </div>
         <p className="mt-2.5 text-center text-[9px] font-medium uppercase tracking-[0.18em] text-muted-foreground/25">
-          v0.1
+          v1.0
         </p>
       </div>
     </aside>
