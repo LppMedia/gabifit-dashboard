@@ -25,9 +25,9 @@ export function WeeklyReportBlock({ report }: Props) {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
           { label: "Posts esta semana", value: String(resumenSemana.totalPosts),                  color: "text-lime-400"    },
-          { label: "Total likes",       value: resumenSemana.totalLikes.toLocaleString(),         color: "text-pink-400"   },
-          { label: "Total vistas",      value: resumenSemana.totalViews.toLocaleString(),         color: "text-cyan-400"   },
-          { label: "Engagement",        value: `${resumenSemana.avgEngagementRate.toFixed(1)}%`,  color: "text-violet-400" },
+          { label: "Total likes",       value: (resumenSemana.totalLikes ?? 0).toLocaleString(),         color: "text-pink-400"   },
+          { label: "Total vistas",      value: (resumenSemana.totalViews ?? 0).toLocaleString(),         color: "text-cyan-400"   },
+          { label: "Engagement",        value: `${(resumenSemana.avgEngagementRate ?? 0).toFixed(1)}%`,  color: "text-violet-400" },
         ].map(({ label, value, color }) => (
           <div key={label} className="rounded-xl border border-border/40 bg-card px-5 py-4">
             <p className={cn("font-display text-[28px] font-bold tabular-nums leading-none", color)}>{value}</p>
@@ -46,7 +46,7 @@ export function WeeklyReportBlock({ report }: Props) {
               Top Posts — Por qué funcionaron
             </h3>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {topPosts.slice(0, 5).map((post, i) => (
+              {topPosts.slice(0, 3).map((post, i) => (
                 <div key={post.shortCode} className="flex flex-col rounded-xl border border-border/30 bg-white/[0.02] overflow-hidden">
                   <div className="relative aspect-[4/5] bg-gradient-to-br from-purple-900/30 to-pink-900/20 overflow-hidden">
                     {post.thumbnailUrl && (
