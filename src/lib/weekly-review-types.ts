@@ -1,3 +1,5 @@
+import type { PlatformKey, ContentTypeKey } from "@/lib/calendar-data";
+
 export interface TopPostReport {
   shortCode: string;
   thumbnailUrl: string;        // enriched server-side from Apify displayUrl
@@ -24,13 +26,13 @@ export interface WeeklyReport {
 
 export interface ContentPlanPost {
   fecha: string;                 // "YYYY-MM-DD"
-  plataforma: "instagram" | "tiktok" | "youtube";
+  plataforma: PlatformKey;
   formato: string;               // "Reel" | "Carrusel" | "Story" | "Short" | "Video"
   tema: string;
   hook: string;                  // exact opening line ready to record
   cta: string;
   caption: string;               // full caption, max ~150 chars
-  tipo: "informativo" | "ventas" | "viralidad";
+  tipo: ContentTypeKey;
   apuntaA: "curso" | "evento" | "comunidad" | null;
 }
 
