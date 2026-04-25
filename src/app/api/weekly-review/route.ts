@@ -31,14 +31,22 @@ export async function POST(req: NextRequest) {
     engagementRate?: number;
   };
 
-  // ── Compute profile-wide averages for relative benchmarking ────────────────
+  // ── Compute profile-wide averages for relative benchmarking ──────────────────
   const totalEngPosts = posts.filter((p: RawPost) => p.videoViewCount > 0);
   const avgViews = totalEngPosts.length
     ? totalEngPosts.reduce((s: number, p: RawPost) => s + p.videoViewCount, 0) / totalEngPosts.length
     : 0;
   const avgLikesAll = posts.reduce((s: number, p: RawPost) => s + p.likesCount, 0) / posts.length;
 
-  // ── Build posts text for the prompt ────────────────────────────────────────
+  // ── Sort posts by engagement to identify top 3 clearly ───────────────────────
+  const sortedPosts = [...posts].sort((a: RawPost, b: RawPost) => {
+    const scoreA = (a.videoViewCount || 0) + (a.likesCount || 0) * 3 + (a.commentsCount || 0) * 5;
+    const scoreB = (b.videoViewCount || 0) + (b.likesCount || 0) * 3 + (b.commentsCount || 0) * 5;
+    return scoreB - scoreA;
+  });
+  const top3Codes = sortedPosts.slice(0, 3).map((p: RawPost) => p.shortCode);
+
+  // ── Build posts text for the prompt ──────────────────────────────────────────
   const postsText = posts
     .map((p: RawPost, i: number) => {
       const transcript = transcripts?.[p.shortCode] ?? "";
@@ -51,18 +59,19 @@ export async function POST(req: NextRequest) {
       const vsAvgViews = views > 0 && avgViews > 0
         ? views >= avgViews * 1.5 ? "⬆ sobre promedio" : views <= avgViews * 0.6 ? "⬇ bajo promedio" : "≈ promedio"
         : "";
-      return `POST ${i + 1} [ID: ${p.shortCode}] (${p.type}):
+      const isTop3 = top3Codes.includes(p.shortCode) ? " ★TOP3★" : "";
+      return `POST ${i + 1}${isTop3} [ID: ${p.shortCode}] (${p.type}):
 - Likes: ${likes} | Comentarios: ${comments} | Vistas: ${views} ${vsAvgViews} | Eng: ${engRate}%
-- Caption (primeras 200 chars): ${p.caption?.slice(0, 200) ?? "(sin caption)"}
-- Fecha: ${new Date(p.timestamp).toLocaleDateString("es-DO", { weekday: "short", day: "numeric", month: "short" })}${transcript ? `\n- Audio (transcripción parcial): ${transcript.slice(0, 500)}` : ""}`;
+- Caption completo: ${p.caption ?? "(sin caption)"}
+- Fecha: ${new Date(p.timestamp).toLocaleDateString("es-DO", { weekday: "short", day: "numeric", month: "short" })}${transcript ? `\n- Transcripción de audio: ${transcript.slice(0, 800)}` : ""}`;
     })
     .join("\n\n");
 
   const postIds = posts.map((p: RawPost) => p.shortCode);
 
-  // ── Compute next Monday for plan date anchoring ─────────────────────────────
+  // ── Compute next Monday for plan date anchoring ───────────────────────────────
   const today = new Date();
-  const dow = today.getDay(); // 0=Sun,1=Mon,...
+  const dow = today.getDay();
   const daysToMonday = dow === 1 ? 7 : dow === 0 ? 1 : 8 - dow;
   const nextMonday = new Date(today);
   nextMonday.setDate(today.getDate() + daysToMonday);
@@ -97,12 +106,6 @@ FORMATOS QUE ESTÁN GANANDO AHORA:
 • Texto on-screen en primeros 2s (no esperar el habla) → retención alta sin audio
 • Carrusel educativo con slide 1 que promete transformación específica
 
-FORMATOS QUE ESTÁN PERDIENDO FUERZA:
-• Reels largos de más de 45s con introducción lenta
-• Posts estáticos sin texto overlay ni valor educativo
-• Captions genéricas sin historia personal
-• Hashtags masivos (#fitness #gym) → menor alcance que hashtags de nicho exacto
-
 HOOKS QUE FUNCIONAN EN EL NICHO AHORA:
 • "Si tienes diastasis abdominal, PARA todo y mira esto 🛑"
 • "Nadie te dijo esto después del parto..."
@@ -115,20 +118,11 @@ ALGORITMO IG 2025:
 • Saves y compartidos > likes para reach orgánico
 • Consistencia 4-5x/semana supera frecuencia 1-2x aunque sea mejor contenido
 • Primeras 24h determinan si el Reel "vuela" o muere
-• Audio trending = boost inicial, luego el contenido decide
-• Subtítulos en pantalla = +40% retención (muchos ven sin sonido)
+• Subtítulos en pantalla = +40% retención
 • Responder comentarios en primera hora = señal positiva al algoritmo
-• Carruseles tienen el mayor tiempo de visualización → favorecidos para explorar
-
-PILARES DE CONTENIDO QUE CONVIERTEN EN ESTE NICHO:
-1. EDUCACIÓN: "Cómo se recupera el suelo pélvico realmente" (autoridad)
-2. INSPIRACIÓN REAL: progreso auténtico tuyo o de clientas (no perfecto)
-3. ERRORES COMUNES: "Lo que te dijeron mal sobre el postparto" (saves)
-4. RUTINAS RÁPIDAS: "10 min siendo mamá de 0-3 años" (valor inmediato)
-5. COMUNIDAD: preguntas, encuestas, "cuéntame tu historia" (comentarios)
 
 ═══════════════════════════════════════════
-POSTS A ANALIZAR (${posts.length} publicaciones recientes):
+POSTS A ANALIZAR (${posts.length} publicaciones):
 ═══════════════════════════════════════════
 Promedio de vistas del perfil: ${Math.round(avgViews).toLocaleString()} vistas/video
 Promedio de likes: ${Math.round(avgLikesAll).toLocaleString()} likes/post
@@ -136,27 +130,55 @@ Promedio de likes: ${Math.round(avgLikesAll).toLocaleString()} likes/post
 ${postsText}
 
 ${competitorSummary ? `COMPETIDORES:\n${competitorSummary}\n` : ""}
-IDs para postAnalyses y weeklyReport.topPosts: ${postIds.join(", ")}
+IDs disponibles: ${postIds.join(", ")}
+TOP 3 IDs (los más performantes): ${top3Codes.join(", ")}
 
 ═══════════════════════════════════════════
-INSTRUCCIONES DE ANÁLISIS
+INSTRUCCIONES — LEE CON ATENCIÓN
 ═══════════════════════════════════════════
-Para cada post, diagnostica ESPECÍFICAMENTE:
-- ¿Qué elemento técnico funcionó o falló? (hook visual, caption, formato, duración, CTA)
-- ¿Qué emoción activó o no activó? (inspiración, miedo a perderse algo, validación, humor)
-- ¿Qué elemento específico repetir o evitar?
-SÉ DIAGNÓSTICO, NO GENÉRICO. "El hook capturó atención" no es suficiente.
-Di: "El texto 'POV: tu cuerpo después de 3 hijos' en los primeros 2s activó identificación inmediata en mamás con vergüenza corporal."
+
+SECCIÓN weeklyReport.topVideos — ANÁLISIS PROFUNDO DE LOS 3 MEJORES VIDEOS:
+Para cada uno de los 3 posts marcados ★TOP3★, genera:
+1. porQueFuncionó: Diagnóstico específico de 3-4 oraciones. NO genérico. Di exactamente qué elemento visual/textual/emocional determinó el resultado y por qué resonó con mamás latinas postparto.
+2. estructura: Extrae la estructura del contenido desde la caption y el tipo de video:
+   - hook: Las primeras palabras exactas / texto en pantalla en los primeros 2 segundos
+   - problema: El dolor o situación que aborda el video
+   - solucion: Qué ofrece o muestra como solución
+   - cta: Qué acción pide o implica al final
+   - ritmo: Estilo de edición y pacing (cortes, velocidad, texto en pantalla, duración estimada)
+   - porQueFunciona: Por qué esta estructura específica conecta con el público objetivo
+3. angulos: EXACTAMENTE 5 variaciones del mismo tema desde ángulos distintos. Cada ángulo debe:
+   - Ser completamente diferente al original y a los otros 4
+   - Tener un hook exacto y listo para grabar (las primeras palabras del video)
+   - Apuntar a un segmento diferente (primeriza, mamá de 3, mamá que trabaja, etc.)
+
+SECCIÓN weeklyReport.videosRecomendados — 8 IDEAS PARA EL NICHO FITNESS POSTPARTO:
+Videos que NO ha hecho Gabi pero que están funcionando en el nicho ahora mismo.
+Considera: fitness postparto, diastasis abdominal, suelo pélvico, lactancia y ejercicio, recuperación posparto, crianza + bienestar físico, imagen corporal postparto.
+Mezcla los 3 tipos: 30% relacionadoA=curso, 20% relacionadoA=evento, 50% relacionadoA=comunidad.
+
+SECCIÓN contentPlan — CALENDARIO SEMANAL CON GUIONES COMPLETOS:
+Para cada post del plan, incluye un guion COMPLETO y listo para grabar:
+guion format:
+"HOOK (0-3s): [texto exacto que Gabi dice o aparece en pantalla]
+DESARROLLO (3-Xs): [lo que dice Gabi, punto por punto, en su voz]
+CTA (últimos 3s): [texto exacto del cierre]
+TEXTO EN PANTALLA: [subtítulos clave / overlays]"
+
+El guion debe estar en la voz de Gabi: cálida, dominicana, directa, como amiga. No formal. Usa "mami", "nena", "te lo juro", expresiones caribeñas auténticas cuando aplique.
 
 Para contentPlan:
 - Primer post a partir del lunes: ${nextMondayStr}
 - ${scopeInstruction}
-- Distribución de CTAs: ~30% apuntaA=curso, ~20% apuntaA=evento, ~50% apuntaA=comunidad o null
+- Distribución CTAs: ~30% apuntaA=curso, ~20% apuntaA=evento, ~50% apuntaA=comunidad o null
 - Plataformas: ~60% instagram, ~25% tiktok, ~15% youtube
-- Captions: máx 150 caracteres (cortos y directos, se expanden en el editor)
-- Cada caption debe terminar con un CTA de acción (Guarda esto / Comenta / Link en bio)
+- notasProduccion: incluye encuadre, luz recomendada, si necesita B-roll, props, etc.
 
-Genera ÚNICAMENTE JSON válido (sin markdown, sin explicaciones fuera del JSON):
+═══════════════════════════════════════════
+FORMATO DE RESPUESTA — SOLO JSON VÁLIDO
+═══════════════════════════════════════════
+Sin markdown, sin explicaciones fuera del JSON.
+
 {
   "weekSummary": {
     "totalPosts": 0,
@@ -165,54 +187,52 @@ Genera ÚNICAMENTE JSON válido (sin markdown, sin explicaciones fuera del JSON)
     "totalViews": 0,
     "avgEngagement": "0%",
     "bestPerformingType": "Reel|Carrusel|Post",
-    "topPost": { "caption": "...", "likes": 0, "why": "En 1 oración diagnóstica específica: qué elemento exacto lo hizo viral" }
+    "topPost": { "caption": "...", "likes": 0, "why": "diagnóstico específico en 1 oración" }
   },
   "postAnalyses": [
     {
       "shortCode": "ID_DEL_POST",
       "performanceScore": 0,
       "tier": "viral|good|avg|low",
-      "why": "Diagnóstico específico: qué elemento visual/textual/emocional determinó el resultado",
-      "whatToRepeat": "El elemento concreto a replicar en el próximo video (con ejemplo de cómo hacerlo)"
+      "why": "diagnóstico específico del resultado",
+      "whatToRepeat": "elemento concreto a replicar"
     }
   ],
   "voiceAnalysis": {
-    "strengths": ["Fortaleza específica de Gabi que conecta con su audiencia"],
-    "opportunities": ["Oportunidad concreta que NO está aprovechando aún"],
+    "strengths": ["fortaleza específica"],
+    "opportunities": ["oportunidad concreta"],
     "toneScore": 0,
     "consistencyScore": 0
   },
-  "topicsThisWeek": ["Tema detectado 1"],
+  "topicsThisWeek": ["tema detectado"],
   "audienceAlignment": {
     "score": 0,
-    "notes": "Análisis de qué tan bien el contenido habla directamente a mamás latinas postparto 25-40",
-    "emotionalHooks": ["Hook emocional que YA está funcionando"]
+    "notes": "análisis de alineación con mamás latinas postparto 25-40",
+    "emotionalHooks": ["hook emocional que YA está funcionando"]
   },
   "trendInsights": {
-    "topFormatsNow": ["Formato específico que está explotando AHORA para este nicho"],
-    "viralHooksToTest": ["Hook exacto listo para grabar esta semana"],
-    "contentGaps": ["Tema que la competencia está cubriendo y GabiFit no"],
-    "algorithmTips": ["Tip de algoritmo específico basado en el patrón de los posts analizados"]
+    "topFormatsNow": ["formato específico explotando ahora"],
+    "viralHooksToTest": ["hook exacto listo para grabar"],
+    "contentGaps": ["tema que la competencia cubre y GabiFit no"],
+    "algorithmTips": ["tip de algoritmo basado en estos posts"]
   },
   "growthStrategy": {
-    "mainBottleneck": "El freno #1 del crecimiento basado en el análisis de estos posts",
-    "quickWins": ["Cosa que Gabi puede hacer ESTA semana para subir alcance — específica y accionable"],
+    "mainBottleneck": "freno #1 al crecimiento",
+    "quickWins": ["acción concreta para subir alcance esta semana"],
     "contentPillars": [
-      { "pillar": "Nombre del pilar", "why": "Por qué este pilar es clave para el nicho ahora", "frequency": "Xveces/semana", "exampleHook": "Hook de ejemplo listo para grabar" }
+      { "pillar": "nombre del pilar", "why": "por qué es clave ahora", "frequency": "Xveces/semana", "exampleHook": "hook de ejemplo listo para grabar" }
     ]
   },
-  "competitorInsights": "Qué están haciendo diferente los competidores y qué puede adaptar Gabi",
+  "competitorInsights": "qué hacen diferente los competidores y qué puede adaptar Gabi",
   "nextWeekPlan": {
-    "theme": "Tema central unificador para la próxima semana",
+    "theme": "tema central unificador de la próxima semana",
     "contentPieces": [
-      { "day": "Lunes", "format": "Reel", "topic": "Tema específico", "hook": "Hook de apertura EXACTO listo para grabar", "cta": "CTA específico con la acción que quieres que hagan", "notes": "Detalles de producción" }
+      { "day": "Lunes", "format": "Reel", "topic": "tema específico", "hook": "hook de apertura EXACTO", "cta": "CTA específico", "notes": "detalles de producción" }
     ],
-    "hashtags": ["hashtag_nicho_exacto_1"],
-    "keyMessage": "Mensaje central que une todo el contenido de la semana en 1 frase"
+    "hashtags": ["hashtag_nicho_exacto"],
+    "keyMessage": "mensaje central que une el contenido de la semana"
   },
-  "actionItems": [
-    "Acción MUY específica y accionable #1 — qué grabar, cuándo publicar, qué decir"
-  ],
+  "actionItems": ["acción MUY específica y accionable"],
   "weeklyReport": {
     "resumenSemana": {
       "totalPosts": 0,
@@ -222,14 +242,31 @@ Genera ÚNICAMENTE JSON válido (sin markdown, sin explicaciones fuera del JSON)
       "avgEngagementRate": 0.0,
       "bestPerformingFormat": "Reel"
     },
-    "topPosts": [
+    "topVideos": [
       {
-        "shortCode": "ID_DEL_POST_MAS_EXITOSO",
-        "porQueFuncionó": "Diagnóstico específico de 2-3 oraciones: qué elemento técnico/emocional determinó el resultado",
-        "queRepetir": "Acción concreta lista para implementar esta semana"
+        "shortCode": "ID_TOP_VIDEO_1",
+        "porQueFuncionó": "diagnóstico específico de 3-4 oraciones: qué elemento técnico/emocional determinó el resultado",
+        "estructura": {
+          "hook": "texto exacto de apertura",
+          "problema": "el dolor que aborda",
+          "solucion": "lo que ofrece como solución",
+          "cta": "acción que pide al final",
+          "ritmo": "notas de pacing y edición",
+          "porQueFunciona": "por qué esta estructura resonó con mamás postparto"
+        },
+        "angulos": [
+          { "numero": 1, "titulo": "Ángulo 1: [nombre descriptivo]", "angulo": "perspectiva específica", "hook": "texto EXACTO de apertura listo para grabar", "diferenciador": "qué hace único este ángulo vs el original" },
+          { "numero": 2, "titulo": "Ángulo 2: [nombre descriptivo]", "angulo": "perspectiva específica", "hook": "texto EXACTO de apertura listo para grabar", "diferenciador": "qué hace único este ángulo vs el original" },
+          { "numero": 3, "titulo": "Ángulo 3: [nombre descriptivo]", "angulo": "perspectiva específica", "hook": "texto EXACTO de apertura listo para grabar", "diferenciador": "qué hace único este ángulo vs el original" },
+          { "numero": 4, "titulo": "Ángulo 4: [nombre descriptivo]", "angulo": "perspectiva específica", "hook": "texto EXACTO de apertura listo para grabar", "diferenciador": "qué hace único este ángulo vs el original" },
+          { "numero": 5, "titulo": "Ángulo 5: [nombre descriptivo]", "angulo": "perspectiva específica", "hook": "texto EXACTO de apertura listo para grabar", "diferenciador": "qué hace único este ángulo vs el original" }
+        ]
       }
     ],
-    "insights": "Párrafo de 3-4 oraciones: qué tipo de contenido ganó esta semana, qué patrón emergió, qué emoción activó más engagement",
+    "insights": "párrafo de 3-4 oraciones: qué ganó esta semana, qué patrón emergió, qué emoción activó más engagement",
+    "videosRecomendados": [
+      { "titulo": "título del video recomendado", "hook": "texto EXACTO de apertura listo para grabar", "angulo": "ángulo / enfoque del contenido", "formato": "Reel 20-30s | Carrusel 5 slides | etc.", "porQueAhora": "por qué este tema funciona AHORA en el nicho", "relacionadoA": "curso|evento|comunidad" }
+    ],
     "estrategia": [
       "Acción #1: específica y accionable para esta semana",
       "Acción #2: específica y accionable",
@@ -246,12 +283,14 @@ Genera ÚNICAMENTE JSON válido (sin markdown, sin explicaciones fuera del JSON)
             "fecha": "YYYY-MM-DD",
             "plataforma": "instagram|tiktok|youtube",
             "formato": "Reel|Carrusel|Story|Short|Video",
-            "tema": "Tema específico del post",
-            "hook": "Hook de apertura EXACTO — las primeras palabras del video/post",
+            "tema": "tema específico del post",
+            "hook": "hook de apertura EXACTO — primeras palabras del video/post",
+            "guion": "HOOK (0-3s): [texto exacto]\\nDESARROLLO (3-Xs): [script completo en voz de Gabi]\\nCTA (últimos 3s): [cierre exacto]\\nTEXTO EN PANTALLA: [overlays clave]",
             "cta": "CTA específico con la acción que se busca",
-            "caption": "Caption en voz GabiFit, máx 150 chars, termina con CTA",
+            "caption": "caption en voz GabiFit, máx 150 chars, termina con CTA",
             "tipo": "informativo|ventas|viralidad",
-            "apuntaA": "curso|evento|comunidad"
+            "apuntaA": "curso|evento|comunidad",
+            "notasProduccion": "encuadre, luz, B-roll necesario, props, subtítulos"
           }
         ]
       }
@@ -268,7 +307,7 @@ Genera ÚNICAMENTE JSON válido (sin markdown, sin explicaciones fuera del JSON)
     body: JSON.stringify({
       model: MODEL,
       messages: [{ role: "user", content: prompt }],
-      max_tokens: scope === "month" ? 9000 : 6500,
+      max_tokens: scope === "month" ? 16000 : 12000,
     }),
   });
 
@@ -292,7 +331,7 @@ Genera ÚNICAMENTE JSON válido (sin markdown, sin explicaciones fuera del JSON)
     );
   }
 
-  // ── Override weekSummary with real computed values ──────────────────────────
+  // ── Override weekSummary with real computed values ────────────────────────────
   const realLikes    = posts.reduce((s: number, p: RawPost) => s + (p.likesCount    || 0), 0);
   const realComments = posts.reduce((s: number, p: RawPost) => s + (p.commentsCount || 0), 0);
   const realViews    = posts.reduce((s: number, p: RawPost) => s + (p.videoViewCount || 0), 0);
@@ -307,7 +346,7 @@ Genera ÚNICAMENTE JSON válido (sin markdown, sin explicaciones fuera del JSON)
   ws.totalViews    = realViews;
   ws.avgEngagement = ws.avgEngagement || realAvgEng;
 
-  // ── Override weeklyReport.resumenSemana with last-7-days computed values ────
+  // ── Override weeklyReport.resumenSemana with last-7-days computed values ──────
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const recentPosts = posts.filter((p: RawPost) => new Date(p.timestamp) >= sevenDaysAgo);
@@ -315,15 +354,12 @@ Genera ÚNICAMENTE JSON válido (sin markdown, sin explicaciones fuera del JSON)
   const recentLikes    = recentPosts.reduce((s: number, p: RawPost) => s + (p.likesCount    || 0), 0);
   const recentComments = recentPosts.reduce((s: number, p: RawPost) => s + (p.commentsCount || 0), 0);
   const recentViews    = recentPosts.reduce((s: number, p: RawPost) => s + (p.videoViewCount || 0), 0);
-  const recentAvgEng = recentViews > 0
+  const recentAvgEng   = recentViews > 0
     ? parseFloat(((recentLikes + recentComments) / recentViews * 100).toFixed(2))
     : 0;
 
-  // Count best performing format in recent posts
   const formatCount: Record<string, number> = {};
-  recentPosts.forEach((p: RawPost) => {
-    formatCount[p.type] = (formatCount[p.type] ?? 0) + 1;
-  });
+  recentPosts.forEach((p: RawPost) => { formatCount[p.type] = (formatCount[p.type] ?? 0) + 1; });
   const bestFormat = recentPosts.length > 0
     ? (Object.entries(formatCount).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "")
     : "";
@@ -339,18 +375,19 @@ Genera ÚNICAMENTE JSON válido (sin markdown, sin explicaciones fuera del JSON)
       bestPerformingFormat: bestFormat,
     };
 
-    // ── Enrich topPosts with thumbnailUrl + real metrics ──────────────────────
-    const rawTopPosts = wr.topPosts;
-    if (Array.isArray(rawTopPosts) && rawTopPosts.length) {
-      const postsMap = new Map<string, RawPost>(posts.map((p: RawPost) => [p.shortCode, p]));
-      wr.topPosts = rawTopPosts
-        .filter((tp): tp is Record<string, unknown> => !!tp && typeof tp === "object")
-        .map((tp) => {
-          const code = typeof tp.shortCode === "string" ? tp.shortCode : "";
-          const src = postsMap.get(code);
+    // ── Enrich topVideos with caption + thumbnailUrl + real metrics ───────────
+    const postsMap = new Map<string, RawPost>(posts.map((p: RawPost) => [p.shortCode, p]));
+    const rawTopVideos = wr.topVideos;
+    if (Array.isArray(rawTopVideos) && rawTopVideos.length) {
+      wr.topVideos = rawTopVideos
+        .filter((tv): tv is Record<string, unknown> => !!tv && typeof tv === "object")
+        .map((tv) => {
+          const code = typeof tv.shortCode === "string" ? tv.shortCode : "";
+          const src  = postsMap.get(code);
           return {
-            ...tp,
+            ...tv,
             thumbnailUrl:   src?.displayUrl    ?? "",
+            caption:        src?.caption       ?? "",
             likesCount:     src?.likesCount    ?? 0,
             commentsCount:  src?.commentsCount ?? 0,
             videoViewCount: src?.videoViewCount ?? 0,
