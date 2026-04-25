@@ -776,7 +776,7 @@ export default function InstagramPage() {
                     ) : planStep === "analyzing" || planStep === "saving" ? (
                       <div className="flex items-center gap-3 text-[13px] text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin text-lime-400" />
-                        {planStep === "analyzing" ? "Analizando con IA... (30-60 seg)" : "Guardando análisis..."}
+                        {planStep === "analyzing" ? "Analizando con IA... (2-5 min, no cierres esta página)" : "Guardando análisis..."}
                       </div>
                     ) : planStep === "error" ? (
                       <div className="flex flex-col gap-3">
