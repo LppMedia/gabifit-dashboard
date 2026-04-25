@@ -449,7 +449,7 @@ export default function InstagramPage() {
           setPaMap(map);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const wr = (savedAnalysis as any).weeklyReport;
-          if (wr?.resumenSemana && Array.isArray(wr.topPosts)) setWeeklyReport(wr);
+          if (wr?.resumenSemana && (Array.isArray(wr.topVideos) || Array.isArray(wr.topPosts))) setWeeklyReport(wr);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const cp = (savedAnalysis as any).contentPlan;
           if (cp?.scope && Array.isArray(cp.semanas)) setContentPlan(cp);
