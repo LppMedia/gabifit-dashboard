@@ -1,8 +1,61 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const KIE_KEY = process.env.KIE_AI_API_KEY ?? "";
-const KIE_URL = "https://kieai.erweima.ai/api/v1/chat/completions";
-const MODEL   = "claude-opus-4-5";
+
+// ── AI call helper: tries Claude (Anthropic format), falls back to Gemini (OpenAI format)
+const MODELS_FALLBACK = [
+  { model: "claude-sonnet-4-5", url: "https://api.kie.ai/claude/v1/messages",                    format: "anthropic" },
+  { model: "claude-sonnet-4-5", url: "https://api.kie.ai/claude/v1/messages",                    format: "anthropic" }, // retry
+  { model: "gemini-2.5-flash",  url: "https://api.kie.ai/gemini-2.5-flash/v1/chat/completions",  format: "openai"    }, // fallback
+] as const;
+
+async function callKieAI(prompt: string, maxTokens: number): Promise<{ text: string; model: string }> {
+  let lastErr = "Unknown error";
+  for (const { model, url, format } of MODELS_FALLBACK) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${KIE_KEY}` },
+        body: JSON.stringify(
+          format === "anthropic"
+            ? { model, messages: [{ role: "user", content: prompt }], max_tokens: maxTokens, stream: false }
+            : { model, messages: [{ role: "user", content: prompt }], max_tokens: maxTokens }
+        ),
+      });
+
+      const data = await res.json();
+
+      // Detect hard error from KIE (comes back as HTTP 5xx or error body)
+      if (!res.ok || data?.type === "error" || data?.code === 401 || data?.code === 500) {
+        lastErr = data?.error?.message ?? data?.msg ?? `HTTP ${res.status}`;
+        console.error(`[weekly-review] ${model} error:`, lastErr);
+        // Wait 3s before retry
+        await new Promise((r) => setTimeout(r, 3000));
+        continue;
+      }
+
+      // Parse content based on format
+      const text = format === "anthropic"
+        ? (data?.content?.[0]?.text ?? "")
+        : (data?.choices?.[0]?.message?.content ?? "");
+
+      if (!text.trim()) {
+        lastErr = `${model} returned empty content`;
+        console.error("[weekly-review]", lastErr);
+        await new Promise((r) => setTimeout(r, 3000));
+        continue;
+      }
+
+      console.log(`[weekly-review] Success with ${model}`);
+      return { text, model };
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e);
+      console.error(`[weekly-review] ${model} threw:`, lastErr);
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+  }
+  throw new Error(lastErr);
+}
 
 export async function POST(req: NextRequest) {
   if (!KIE_KEY) {
@@ -298,35 +351,32 @@ Sin markdown, sin explicaciones fuera del JSON.
   }
 }`;
 
-  const res = await fetch(KIE_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${KIE_KEY}`,
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: scope === "month" ? 16000 : 12000,
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.text().catch(() => "");
-    console.error("[weekly-review] KIE error:", err);
-    return NextResponse.json({ error: `Error IA: ${res.status}` }, { status: 502 });
+  let rawText: string;
+  try {
+    const result = await callKieAI(prompt, scope === "month" ? 16000 : 12000);
+    rawText = result.text;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: `IA no disponible: ${msg}` }, { status: 502 });
   }
-
-  const data    = await res.json();
-  const rawText: string = data?.choices?.[0]?.message?.content ?? "{}";
 
   let analysis: Record<string, unknown>;
   try {
     const cleaned = rawText.replace(/```json?\n?/g, "").replace(/```/g, "").trim();
     analysis = JSON.parse(cleaned);
   } catch {
+    console.error("[weekly-review] JSON parse failed. rawText slice:", rawText.slice(0, 500));
     return NextResponse.json(
       { error: "IA devolvió JSON inválido", raw: rawText.slice(0, 500) },
+      { status: 502 }
+    );
+  }
+
+  // Guard: ensure the critical sections are present
+  if (!analysis.weeklyReport || !analysis.contentPlan) {
+    console.error("[weekly-review] Missing weeklyReport or contentPlan in AI response. Keys:", Object.keys(analysis));
+    return NextResponse.json(
+      { error: "IA respondió pero le faltaron secciones clave (weeklyReport/contentPlan). Reintenta.", raw: rawText.slice(0, 800) },
       { status: 502 }
     );
   }
