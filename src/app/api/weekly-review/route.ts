@@ -2,42 +2,39 @@ import { NextRequest, NextResponse } from "next/server";
 
 const KIE_KEY = process.env.KIE_AI_API_KEY ?? "";
 
-// ── AI call helper: tries Claude (Anthropic format), falls back to Gemini (OpenAI format)
+const KIE_URL = "https://kieai.erweima.ai/api/v1/chat/completions";
+
+// ── AI call helper: tries DeepSeek R1, falls back to DeepSeek Chat
 const MODELS_FALLBACK = [
-  { model: "claude-sonnet-4-5", url: "https://api.kie.ai/claude/v1/messages",                    format: "anthropic" },
-  { model: "claude-sonnet-4-5", url: "https://api.kie.ai/claude/v1/messages",                    format: "anthropic" }, // retry
-  { model: "gemini-2.5-flash",  url: "https://api.kie.ai/gemini-2.5-flash/v1/chat/completions",  format: "openai"    }, // fallback
+  { model: "deepseek-reasoner" },
+  { model: "deepseek-chat" },
+  { model: "deepseek-chat" }, // second retry
 ] as const;
 
 async function callKieAI(prompt: string, maxTokens: number): Promise<{ text: string; model: string }> {
   let lastErr = "Unknown error";
-  for (const { model, url, format } of MODELS_FALLBACK) {
+  for (const { model } of MODELS_FALLBACK) {
     try {
-      const res = await fetch(url, {
+      const res = await fetch(KIE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${KIE_KEY}` },
-        body: JSON.stringify(
-          format === "anthropic"
-            ? { model, messages: [{ role: "user", content: prompt }], max_tokens: maxTokens, stream: false }
-            : { model, messages: [{ role: "user", content: prompt }], max_tokens: maxTokens }
-        ),
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: maxTokens,
+        }),
       });
 
       const data = await res.json();
 
-      // Detect hard error from KIE (comes back as HTTP 5xx or error body)
-      if (!res.ok || data?.type === "error" || data?.code === 401 || data?.code === 500) {
+      if (!res.ok || data?.error) {
         lastErr = data?.error?.message ?? data?.msg ?? `HTTP ${res.status}`;
         console.error(`[weekly-review] ${model} error:`, lastErr);
-        // Wait 3s before retry
         await new Promise((r) => setTimeout(r, 3000));
         continue;
       }
 
-      // Parse content based on format
-      const text = format === "anthropic"
-        ? (data?.content?.[0]?.text ?? "")
-        : (data?.choices?.[0]?.message?.content ?? "");
+      const text = data?.choices?.[0]?.message?.content ?? "";
 
       if (!text.trim()) {
         lastErr = `${model} returned empty content`;
