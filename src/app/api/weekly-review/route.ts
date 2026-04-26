@@ -27,8 +27,15 @@ async function callKieAI(prompt: string, maxTokens: number): Promise<{ text: str
 
       const data = await res.json();
 
-      if (!res.ok || data?.error) {
-        lastErr = data?.error?.message ?? data?.msg ?? `HTTP ${res.status}`;
+      // KIE returns HTTP 200 even for errors — check both HTTP status and body codes
+      const isError =
+        !res.ok ||
+        data?.error ||
+        (data?.code && data.code !== 200) ||
+        data?.type === "error";
+
+      if (isError) {
+        lastErr = data?.error?.message ?? data?.msg ?? data?.message ?? `HTTP ${res.status}`;
         console.error(`[weekly-review] ${model} error:`, lastErr);
         await new Promise((r) => setTimeout(r, 3000));
         continue;

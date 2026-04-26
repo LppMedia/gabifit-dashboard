@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import {
   LayoutDashboard,
   Instagram,
@@ -146,9 +147,21 @@ const AI_TOOLS = [
 
 // ─── Página ────────────────────────────────────────────────────────────────────
 export default function OverviewPage() {
-  const hour = new Date().getHours();
-  const greeting =
-    hour < 12 ? "Buenos días" : hour < 18 ? "Buenas tardes" : "Buenas noches";
+  // Computed client-side only to avoid SSR/client hydration mismatch (#418)
+  const [greeting, setGreeting] = useState("Buenos días");
+  const [dateStr, setDateStr] = useState("");
+
+  useEffect(() => {
+    const hour = new Date().getHours();
+    setGreeting(hour < 12 ? "Buenos días" : hour < 18 ? "Buenas tardes" : "Buenas noches");
+    setDateStr(
+      new Date().toLocaleDateString("es-CO", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      })
+    );
+  }, []);
 
   return (
     <div className="flex flex-col gap-8">
@@ -177,13 +190,7 @@ export default function OverviewPage() {
             </h2>
             <p className="mt-2 text-[13px] text-muted-foreground">
               Tu dashboard de contenido está listo.{" "}
-              <span className="text-foreground/60">
-                {new Date().toLocaleDateString("es-CO", {
-                  weekday: "long",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </span>
+              <span className="text-foreground/60">{dateStr}</span>
             </p>
           </div>
 
